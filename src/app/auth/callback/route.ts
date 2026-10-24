@@ -1,0 +1,22 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { ensureOrganizationForUser } from "@/lib/organization";
+import { createClient } from "@/lib/supabase/server";
+
+export async function GET(request: NextRequest) {
+  const { searchParams, origin } = new URL(request.url);
+  const code = searchParams.get("code");
+  const nextPath = searchParams.get("next") ?? "/dashboard";
+
+  if (code) {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (!error) {
+      await ensureOrganizationForUser("我的公司");
+      return NextResponse.redirect(new URL(nextPath, origin));
+    }
+  }
+
+  return NextResponse.redirect(
+    new URL("/login?error=auth_callback", origin),
+  );
+}

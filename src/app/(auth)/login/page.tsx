@@ -1,0 +1,54 @@
+import Link from "next/link";
+import { signIn } from "@/app/actions/auth";
+import { AuthForm, Field } from "@/components/auth/AuthForm";
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ reset?: string; error?: string }>;
+}) {
+  const params = await searchParams;
+
+  return (
+    <>
+      {params.reset === "1" ? (
+        <p className="mx-auto mb-4 max-w-md rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          已清除本機登入 Cookie，請重新登入。
+        </p>
+      ) : null}
+      {params.error === "auth_callback" ? (
+        <p className="mx-auto mb-4 max-w-md rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Email 驗證連結無效或已過期，請重新註冊或聯絡管理員在 Supabase 手動確認 Email。
+        </p>
+      ) : null}
+    <AuthForm
+      title="登入"
+      subtitle="使用您的帳號進入會計管理系統"
+      action={signIn}
+      submitLabel="登入"
+      fields={
+        <>
+          <Field label="Email" name="email" type="email" required />
+          <Field label="密碼" name="password" type="password" required />
+        </>
+      }
+      footer={
+        <div className="space-y-2 text-slate-600">
+          <p>
+            還沒有帳號？{" "}
+            <Link href="/signup" className="font-medium text-slate-900 underline">
+              註冊
+            </Link>
+          </p>
+          <p>
+            出現 HTTP 431 或無法開啟頁面？{" "}
+            <Link href="/auth/clear" className="font-medium text-slate-900 underline">
+              清除登入狀態
+            </Link>
+          </p>
+        </div>
+      }
+    />
+    </>
+  );
+}
