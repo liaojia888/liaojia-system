@@ -41,6 +41,15 @@ export default async function LoginPage({
             </Link>
           </p>
           <p>
+            忘記密碼？{" "}
+            <Link
+              href="/forgot-password"
+              className="font-medium text-slate-900 underline"
+            >
+              寄重設連結到 Email
+            </Link>
+          </p>
+          <p>
             出現 HTTP 431 或無法開啟頁面？{" "}
             <Link href="/auth/clear" className="font-medium text-slate-900 underline">
               清除登入狀態

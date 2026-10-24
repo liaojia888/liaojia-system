@@ -10,6 +10,9 @@ export function translateAuthError(message: string): string {
   if (normalized.includes("user already registered")) {
     return "此 Email 已註冊，請直接登入。";
   }
+  if (normalized.includes("same as the old password")) {
+    return "新密碼不可與舊密碼相同，請換一組密碼。";
+  }
 
   return message;
 }

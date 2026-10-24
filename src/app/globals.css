@@ -131,3 +131,31 @@ body {
   opacity: 1;
   transform: translateY(0);
 }
+
+.ledger-sticky-col {
+  box-shadow: 4px 0 8px -4px rgb(15 23 42 / 0.12);
+}
+
+.ledger-table-scroll {
+  -webkit-overflow-scrolling: touch;
+}
+
+.ledger-touch-input {
+  font-size: 16px;
+}
+
+@media (min-width: 1024px) {
+  .ledger-touch-input {
+    font-size: 0.875rem;
+  }
+}
+
+.ledger-touch-btn {
+  min-height: 2.75rem;
+}
+
+@media (min-width: 640px) {
+  .ledger-touch-btn {
+    min-height: auto;
+  }
+}

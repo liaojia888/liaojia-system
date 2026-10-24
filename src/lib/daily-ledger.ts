@@ -22,6 +22,17 @@ export type LedgerNoteKey =
 
 export type LedgerNotes = Partial<Record<LedgerNoteKey, string>>;
 
+export const LEDGER_NOTE_LABELS: Record<LedgerNoteKey, string> = {
+  fuel: "油",
+  water: "水",
+  urea: "尿素",
+  fpsAmount: "轉數快金額",
+  bankDeposited: "已入銀行",
+  bankPending: "待入銀行",
+  cancelled: "撤單",
+  expenses: "支出",
+};
+
 export type DailyLedgerRow = {
   id: string;
   date: string;

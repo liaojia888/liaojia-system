@@ -69,6 +69,68 @@ export async function signUp(
   redirect("/dashboard");
 }
 
+export async function requestPasswordReset(
+  _prev: { error: string | null; notice: string | null } | void,
+  formData: FormData,
+) {
+  const email = String(formData.get("email") ?? "").trim();
+  if (!email) {
+    return { error: "請輸入 Email。", notice: null };
+  }
+
+  const supabase = await createClient();
+  const redirectTo = `${getAppUrl()}/auth/callback?next=${encodeURIComponent("/reset-password")}`;
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo,
+  });
+
+  if (error) {
+    return { error: translateAuthError(error.message), notice: null };
+  }
+
+  return {
+    error: null,
+    notice:
+      "若此 Email 已註冊，您會收到重設密碼信件（請一併查看垃圾郵件）。點擊連結後可設定新密碼。",
+  };
+}
+
+export async function updatePassword(
+  _prev: { error: string | null; notice: string | null } | void,
+  formData: FormData,
+) {
+  const password = String(formData.get("password") ?? "");
+  const confirm = String(formData.get("confirmPassword") ?? "");
+
+  if (password.length < 6) {
+    return { error: "密碼至少 6 個字元。", notice: null };
+  }
+  if (password !== confirm) {
+    return { error: "兩次輸入的密碼不一致。", notice: null };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      error: "連結已失效或未登入，請至「忘記密碼」重新申請。",
+      notice: null,
+    };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) {
+    return { error: translateAuthError(error.message), notice: null };
+  }
+
+  await ensureOrganizationForUser("我的公司");
+  revalidatePath("/", "layout");
+  redirect("/dashboard");
+}
+
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();

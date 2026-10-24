@@ -36,7 +36,15 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isAuthRoute =
-    path.startsWith("/login") || path.startsWith("/signup");
+    path.startsWith("/login") ||
+    path.startsWith("/signup") ||
+    path.startsWith("/forgot-password");
+
+  if (path.startsWith("/reset-password") && !user) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/forgot-password";
+    return NextResponse.redirect(url);
+  }
   const isProtected =
     path.startsWith("/dashboard") || path.startsWith("/reports");
 

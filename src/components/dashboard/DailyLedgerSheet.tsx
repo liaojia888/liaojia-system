@@ -29,6 +29,7 @@ import {
   formatLedgerRowForWhatsApp,
   openWhatsAppShare,
 } from "@/lib/whatsapp-export";
+import { DailyLedgerMobileRows } from "@/components/dashboard/DailyLedgerMobileRows";
 
 function formatNum(n: number): string {
   if (!n) return "";
@@ -159,6 +160,23 @@ export function DailyLedgerSheet() {
     });
   }, []);
 
+  const openMenuFromAnchor = useCallback(
+    (
+      rowId: string,
+      noteKey: LedgerNoteKey | undefined,
+      anchor: HTMLElement,
+    ) => {
+      const rect = anchor.getBoundingClientRect();
+      setContextMenu({
+        rowId,
+        noteKey,
+        x: Math.min(rect.left, window.innerWidth - 200),
+        y: rect.bottom + 4,
+      });
+    },
+    [],
+  );
+
   const clearRow = useCallback((rowId: string) => {
     if (!confirm("確定要清空這一行的所有金額、轉數快與備註？（日期保留）")) {
       return;
@@ -226,49 +244,54 @@ export function DailyLedgerSheet() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-[#f3f6fb]">
-      <header className="border-b border-slate-200 bg-white px-4 py-4 shadow-sm md:px-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
+      <header className="border-b border-slate-200 bg-white px-3 py-3 shadow-sm sm:px-4 sm:py-4 lg:px-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
               日結工作台
             </p>
-            <h1 className="text-xl font-semibold text-slate-900 md:text-2xl">
+            <h1 className="text-lg font-semibold text-slate-900 sm:text-xl lg:text-2xl">
               {year} 年 {month} 月 · 營收對帳表
             </h1>
-            <p className="mt-1 max-w-2xl text-sm text-slate-600">
-              右鍵可新增／移除列、備註與清空該列；備註顯示在格內右上角。
+            <p className="mt-1 max-w-2xl text-xs text-slate-600 sm:text-sm">
+              <span className="lg:hidden">
+                手機／平板：每列「列操作」或「＋備註」；電腦可右鍵操作。
+              </span>
+              <span className="hidden lg:inline">
+                右鍵可新增／移除列、備註與清空該列；備註顯示在格內右上角。
+              </span>
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
             <button
               type="button"
               onClick={() => setShowAllNotes((v) => !v)}
-              className={`rounded-lg border px-3 py-2 text-sm ${
+              className={`ledger-touch-btn rounded-lg border px-3 py-2.5 text-sm sm:py-2 ${
                 showAllNotes
                   ? "border-amber-300 bg-amber-50 text-amber-900"
                   : "border-slate-300 bg-white hover:bg-slate-50"
               }`}
             >
-              {showAllNotes ? "隱藏全部備註" : "全部顯示備註"}
+              {showAllNotes ? "隱藏備註" : "顯示備註"}
             </button>
             <button
               type="button"
               onClick={() => shiftMonth(-1)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-50"
+              className="ledger-touch-btn rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm hover:bg-slate-50 sm:py-2"
             >
               上個月
             </button>
             <button
               type="button"
               onClick={() => shiftMonth(1)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-50"
+              className="col-span-2 ledger-touch-btn rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm hover:bg-slate-50 sm:col-span-1 sm:py-2"
             >
               下個月
             </button>
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3 lg:grid-cols-4">
           <SummaryChip label="總收入" value={totals.totalRevenue} accent />
           <SummaryChip label="總支出" value={totals.expenses} />
           <SummaryChip label="待入銀行合計" value={totals.bankPending} />
@@ -276,12 +299,33 @@ export function DailyLedgerSheet() {
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-auto p-3 md:p-4">
-        <div className="inline-block min-w-full align-top rounded-lg border border-slate-300 bg-white shadow-sm">
+      <div className="min-h-0 flex-1 overflow-auto p-2 sm:p-3 lg:p-4">
+        <div className="lg:hidden">
+          <DailyLedgerMobileRows
+            rows={computed}
+            totals={totals}
+            showAllNotes={showAllNotes}
+            formatNum={formatNum}
+            parseNum={parseNum}
+            getNote={getNote}
+            updateRow={updateRow}
+            openRowMenu={(rowId, el) => openMenuFromAnchor(rowId, undefined, el)}
+            openCellMenu={(rowId, noteKey, el) =>
+              openMenuFromAnchor(rowId, noteKey, el)
+            }
+          />
+        </div>
+
+        <div className="hidden lg:block">
+          <p className="mb-2 text-center text-xs text-slate-500 xl:hidden">
+            ← 左右滑動可查看更多欄位 →
+          </p>
+          <div className="ledger-table-scroll overflow-x-auto overscroll-x-contain rounded-lg border border-slate-300 bg-white shadow-sm">
+          <div className="inline-block min-w-full align-top">
           <table className="w-full min-w-[1100px] border-collapse text-sm">
             <thead>
               <tr className="bg-[#217346] text-white">
-                <th rowSpan={2} className="ledger-th sticky left-0 z-20 min-w-[7.5rem]">
+                <th rowSpan={2} className="ledger-th ledger-sticky-col sticky left-0 z-20 min-w-[7.5rem]">
                   日期
                 </th>
                 <th colSpan={3} className="ledger-th">
@@ -327,7 +371,7 @@ export function DailyLedgerSheet() {
               {computed.map((row) => (
                 <tr key={row.id} className="group hover:bg-emerald-50/40">
                   <td
-                    className="ledger-td sticky left-0 z-10 bg-white group-hover:bg-emerald-50/40"
+                    className="ledger-td ledger-sticky-col sticky left-0 z-10 bg-white group-hover:bg-emerald-50/40"
                     onContextMenu={(e) => openRowContextMenu(e, row.id)}
                   >
                     <input
@@ -406,7 +450,7 @@ export function DailyLedgerSheet() {
             </tbody>
             <tfoot>
               <tr className="bg-slate-100 font-semibold text-slate-900">
-                <td className="ledger-td sticky left-0 z-10 bg-slate-100">總計</td>
+                <td className="ledger-td ledger-sticky-col sticky left-0 z-10 bg-slate-100">總計</td>
                 <td className="ledger-td text-right tabular-nums">
                   {formatNum(totals.fuel)}
                 </td>
@@ -448,6 +492,8 @@ export function DailyLedgerSheet() {
               </tr>
             </tfoot>
           </table>
+          </div>
+          </div>
         </div>
       </div>
 

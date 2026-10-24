@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { LedgerNoteKey } from "@/lib/daily-ledger";
 
 export type NoteTarget = {
@@ -40,10 +40,19 @@ export function LedgerNoteContextMenu({
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [sheetLayout, setSheetLayout] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const update = () => setSheetLayout(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   useEffect(() => {
     if (!menu) return;
-    const onPointerDown = (e: MouseEvent) => {
+    const onPointerDown = (e: Event) => {
       if (ref.current?.contains(e.target as Node)) return;
       onClose();
     };
@@ -51,30 +60,47 @@ export function LedgerNoteContextMenu({
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("touchstart", onPointerDown);
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("touchstart", onPointerDown);
       window.removeEventListener("keydown", onKey);
     };
   }, [menu, onClose]);
+
+  useEffect(() => {
+    if (!menu || sheetLayout || !ref.current) return;
+    const el = ref.current;
+    const rect = el.getBoundingClientRect();
+    const pad = 8;
+    let left = menu.x;
+    let top = menu.y;
+    if (left + rect.width > window.innerWidth - pad) {
+      left = window.innerWidth - rect.width - pad;
+    }
+    if (top + rect.height > window.innerHeight - pad) {
+      top = window.innerHeight - rect.height - pad;
+    }
+    el.style.left = `${Math.max(pad, left)}px`;
+    el.style.top = `${Math.max(pad, top)}px`;
+  }, [menu, sheetLayout]);
 
   if (!menu) return null;
 
   const showNoteActions = Boolean(menu.noteKey);
 
-  return (
-    <div
-      ref={ref}
-      className="fixed z-50 min-w-[9rem] rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
-      style={{ left: menu.x, top: menu.y }}
-      role="menu"
-    >
+  const itemClass =
+    "block w-full px-4 py-3.5 text-left text-sm hover:bg-slate-100 lg:px-3 lg:py-2";
+
+  const menuBody = (
+    <>
       {showNoteActions ? (
         <>
           <button
             type="button"
             role="menuitem"
-            className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100"
+            className={itemClass}
             onClick={() => {
               onEdit();
               onClose();
@@ -86,7 +112,7 @@ export function LedgerNoteContextMenu({
             <button
               type="button"
               role="menuitem"
-              className="block w-full px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50"
+              className={`${itemClass} text-red-700 hover:bg-red-50`}
               onClick={() => {
                 onClearNote();
                 onClose();
@@ -103,7 +129,7 @@ export function LedgerNoteContextMenu({
       <button
         type="button"
         role="menuitem"
-        className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100"
+        className={itemClass}
         onClick={() => {
           onInsertRow();
           onClose();
@@ -114,7 +140,7 @@ export function LedgerNoteContextMenu({
       <button
         type="button"
         role="menuitem"
-        className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100"
+        className={itemClass}
         onClick={() => {
           onRemoveRow();
           onClose();
@@ -125,7 +151,7 @@ export function LedgerNoteContextMenu({
       <button
         type="button"
         role="menuitem"
-        className="block w-full px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50"
+        className={`${itemClass} text-red-700 hover:bg-red-50`}
         onClick={() => {
           onClearRow();
           onClose();
@@ -137,7 +163,7 @@ export function LedgerNoteContextMenu({
       <button
         type="button"
         role="menuitem"
-        className="block w-full px-3 py-2 text-left text-sm text-emerald-800 hover:bg-emerald-50"
+        className={`${itemClass} text-emerald-800 hover:bg-emerald-50`}
         onClick={() => {
           onWhatsAppRow();
           onClose();
@@ -148,7 +174,7 @@ export function LedgerNoteContextMenu({
       <button
         type="button"
         role="menuitem"
-        className="block w-full px-3 py-2 text-left text-sm text-emerald-800 hover:bg-emerald-50"
+        className={`${itemClass} text-emerald-800 hover:bg-emerald-50`}
         onClick={() => {
           onWhatsAppMonth();
           onClose();
@@ -156,6 +182,40 @@ export function LedgerNoteContextMenu({
       >
         WhatsApp 匯出本月
       </button>
+    </>
+  );
+
+  if (sheetLayout) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col justify-end">
+        <button
+          type="button"
+          className="absolute inset-0 bg-black/35"
+          aria-label="關閉選單"
+          onClick={onClose}
+        />
+        <div
+          ref={ref}
+          className="relative max-h-[min(70dvh,28rem)] overflow-y-auto rounded-t-2xl border border-slate-200 bg-white py-2 shadow-2xl"
+          role="menu"
+        >
+          <p className="px-4 py-2 text-center text-xs font-medium text-slate-500">
+            列操作
+          </p>
+          {menuBody}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={ref}
+      className="fixed z-50 min-w-[9rem] rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+      style={{ left: menu.x, top: menu.y }}
+      role="menu"
+    >
+      {menuBody}
     </div>
   );
 }
