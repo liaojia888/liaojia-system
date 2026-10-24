@@ -5,9 +5,13 @@ import { AuthForm, Field } from "@/components/auth/AuthForm";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ reset?: string; error?: string }>;
+  searchParams: Promise<{ reset?: string; error?: string; redirect?: string }>;
 }) {
   const params = await searchParams;
+  const redirectPath =
+    params.redirect?.startsWith("/") && !params.redirect.startsWith("//")
+      ? params.redirect
+      : "";
 
   return (
     <>
@@ -28,6 +32,9 @@ export default async function LoginPage({
       submitLabel="登入"
       fields={
         <>
+          {redirectPath ? (
+            <input type="hidden" name="redirect" value={redirectPath} />
+          ) : null}
           <Field label="Email" name="email" type="email" required />
           <Field label="密碼" name="password" type="password" required />
         </>

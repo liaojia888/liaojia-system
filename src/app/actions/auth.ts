@@ -21,9 +21,21 @@ export async function signIn(
     return { error: translateAuthError(error.message), notice: null };
   }
 
+  // 確保 session 寫入 cookie（Server Action 內）
+  await supabase.auth.getUser();
+
   await ensureOrganizationForUser("我的公司");
   revalidatePath("/", "layout");
-  redirect("/dashboard");
+
+  const redirectTo = String(formData.get("redirect") ?? "").trim();
+  const safeRedirect =
+    redirectTo.startsWith("/") &&
+    !redirectTo.startsWith("//") &&
+    !redirectTo.startsWith("/login")
+      ? redirectTo
+      : "/dashboard";
+
+  redirect(safeRedirect);
 }
 
 export async function signUp(

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
+import { mergeSupabaseCookies } from "@/lib/supabase/response-cookies";
 
 export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
@@ -43,7 +44,10 @@ export async function updateSession(request: NextRequest) {
   if (path.startsWith("/reset-password") && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/forgot-password";
-    return NextResponse.redirect(url);
+    return mergeSupabaseCookies(
+      supabaseResponse,
+      NextResponse.redirect(url),
+    );
   }
   const isProtected =
     path.startsWith("/dashboard") || path.startsWith("/reports");
@@ -52,13 +56,19 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirect", path);
-    return NextResponse.redirect(url);
+    return mergeSupabaseCookies(
+      supabaseResponse,
+      NextResponse.redirect(url),
+    );
   }
 
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+    return mergeSupabaseCookies(
+      supabaseResponse,
+      NextResponse.redirect(url),
+    );
   }
 
   return supabaseResponse;
