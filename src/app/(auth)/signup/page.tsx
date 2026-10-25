@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { signUp } from "@/app/actions/auth";
+import { AuthEmailHelp } from "@/components/auth/AuthEmailHelp";
 import { AuthForm, Field } from "@/components/auth/AuthForm";
 
 export default function SignUpPage() {
   return (
+    <>
+      <AuthEmailHelp variant="signup" />
     <AuthForm
       title="建立帳號"
       subtitle="註冊後會自動建立公司與預設會計科目"
@@ -32,5 +35,6 @@ export default function SignUpPage() {
         </p>
       }
     />
+    </>
   );
 }

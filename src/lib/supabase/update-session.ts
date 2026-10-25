@@ -50,7 +50,9 @@ export async function updateSession(request: NextRequest) {
     );
   }
   const isProtected =
-    path.startsWith("/dashboard") || path.startsWith("/reports");
+    path.startsWith("/dashboard") ||
+    path.startsWith("/reports") ||
+    path.startsWith("/settings");
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();

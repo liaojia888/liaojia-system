@@ -5,8 +5,6 @@ export type AccountType =
   | "revenue"
   | "expense";
 
-export type JournalStatus = "draft" | "posted";
-
 export type Organization = {
   id: string;
   name: string;
@@ -14,44 +12,13 @@ export type Organization = {
   created_at: string;
 };
 
-export type Account = {
+export type DailyLedgerMonth = {
   id: string;
   organization_id: string;
-  code: string;
-  name: string;
-  type: AccountType;
-  is_active: boolean;
-  created_at: string;
-};
-
-export type JournalEntry = {
-  id: string;
-  organization_id: string;
-  entry_date: string;
-  reference: string | null;
-  description: string;
-  status: JournalStatus;
-  created_by: string | null;
-  created_at: string;
-  posted_at: string | null;
-};
-
-export type JournalLine = {
-  id: string;
-  entry_id: string;
-  account_id: string;
-  debit: number;
-  credit: number;
-  memo: string | null;
-  line_order: number;
-};
-
-export type JournalLineWithAccount = JournalLine & {
-  accounts: Pick<Account, "code" | "name"> | null;
-};
-
-export type JournalEntryWithLines = JournalEntry & {
-  journal_lines: JournalLineWithAccount[];
+  month_key: string;
+  rows: unknown;
+  updated_at: string;
+  updated_by: string | null;
 };
 
 export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
@@ -62,6 +29,7 @@ export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
   expense: "費用",
 };
 
+/** 註冊／建立公司時寫入 Supabase accounts（傳票 UI 已移除，表仍保留供第二階段） */
 export const DEFAULT_ACCOUNTS: {
   code: string;
   name: string;

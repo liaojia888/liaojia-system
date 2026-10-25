@@ -13,6 +13,13 @@ export function translateAuthError(message: string): string {
   if (normalized.includes("same as the old password")) {
     return "新密碼不可與舊密碼相同，請換一組密碼。";
   }
+  if (
+    normalized.includes("rate limit") ||
+    normalized.includes("too many requests") ||
+    normalized.includes("email rate limit")
+  ) {
+    return "寄信過於頻繁，請稍後再試（Supabase 與本系統皆有速率限制）。";
+  }
 
   return message;
 }

@@ -15,12 +15,15 @@ export function EditableCompanyName({
   organizationId,
   compact,
   collapsed,
+  variant = "default",
 }: {
   initialName: string;
   organizationId: string | null;
   compact?: boolean;
   collapsed?: boolean;
+  variant?: "default" | "sidebar";
 }) {
+  const onDark = variant === "sidebar";
   const [name, setName] = useState(initialName);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(initialName);
@@ -106,7 +109,11 @@ export function EditableCompanyName({
         type="button"
         onClick={startEdit}
         title={`${name}（點擊編輯）`}
-        className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-sm font-bold text-emerald-800 hover:bg-emerald-100"
+        className={`mx-auto flex h-10 w-10 items-center justify-center rounded-xl text-sm font-bold transition ${
+          onDark
+            ? "sidebar-org-badge hover:brightness-110"
+            : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+        }`}
       >
         {name.slice(0, 1) || "企"}
       </button>
@@ -122,9 +129,11 @@ export function EditableCompanyName({
           disabled={pending}
           maxLength={80}
           autoFocus
-          className={`w-full rounded-md border border-slate-300 px-2 py-1 outline-none focus:ring-2 focus:ring-emerald-500 ${
-            compact ? "text-sm font-semibold" : "text-lg font-semibold"
-          }`}
+          className={`w-full rounded-lg border px-2 py-1 outline-none focus:ring-2 focus:ring-emerald-500 ${
+            onDark
+              ? "border-white/20 bg-slate-900/80 text-white"
+              : "border-slate-300 bg-white text-slate-900"
+          } ${compact ? "text-sm font-semibold" : "text-lg font-semibold"}`}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
@@ -162,22 +171,28 @@ export function EditableCompanyName({
       <button
         type="button"
         onClick={startEdit}
-        className={`group w-full cursor-pointer rounded-md border border-transparent text-left transition hover:border-slate-200 hover:bg-slate-50 ${
-          compact ? "px-1 py-0.5" : "-mx-1 px-2 py-1"
-        }`}
+        className={`group w-full cursor-pointer rounded-lg border border-transparent text-left transition ${
+          onDark
+            ? "hover:border-white/10 hover:bg-white/5"
+            : "hover:border-slate-200 hover:bg-slate-50"
+        } ${compact ? "px-1 py-0.5" : "-mx-1 px-2 py-1"}`}
         title="點擊編輯公司名稱"
       >
         <span className="flex items-start gap-1.5">
           <span
-            className={`min-w-0 flex-1 text-slate-900 ${
-              compact ? "truncate text-sm font-semibold" : "text-lg font-semibold"
-            }`}
+            className={`min-w-0 flex-1 ${
+              onDark ? "text-white" : "text-slate-900"
+            } ${compact ? "truncate text-sm font-semibold" : "text-lg font-semibold"}`}
           >
             {name}
           </span>
           {!compact ? (
             <span
-              className="mt-1 shrink-0 text-slate-400 group-hover:text-emerald-700"
+              className={`mt-1 shrink-0 ${
+                onDark
+                  ? "text-slate-500 group-hover:opacity-100"
+                  : "text-slate-400 group-hover:text-emerald-700"
+              }`}
               aria-hidden
             >
               ✎
@@ -185,7 +200,13 @@ export function EditableCompanyName({
           ) : null}
         </span>
         {!compact ? (
-          <span className="mt-0.5 block text-xs text-slate-500 group-hover:text-emerald-700">
+          <span
+            className={`mt-0.5 block text-xs ${
+              onDark
+                ? "text-slate-500 group-hover:text-[var(--sidebar-brand)]"
+                : "text-slate-500 group-hover:text-emerald-700"
+            }`}
+          >
             點擊編輯公司名稱
           </span>
         ) : null}

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { signIn } from "@/app/actions/auth";
+import { AuthEmailHelp } from "@/components/auth/AuthEmailHelp";
 import { AuthForm, Field } from "@/components/auth/AuthForm";
+import { ResendVerificationForm } from "@/components/auth/ResendVerificationForm";
 
 export default async function LoginPage({
   searchParams,
@@ -25,6 +27,8 @@ export default async function LoginPage({
           Email 驗證連結無效或已過期，請重新註冊或聯絡管理員在 Supabase 手動確認 Email。
         </p>
       ) : null}
+      <AuthEmailHelp variant="login" />
+      <ResendVerificationForm />
     <AuthForm
       title="登入"
       subtitle="使用您的帳號進入會計管理系統"
@@ -54,12 +58,6 @@ export default async function LoginPage({
               className="font-medium text-slate-900 underline"
             >
               寄重設連結到 Email
-            </Link>
-          </p>
-          <p>
-            出現 HTTP 431 或無法開啟頁面？{" "}
-            <Link href="/auth/clear" className="font-medium text-slate-900 underline">
-              清除登入狀態
             </Link>
           </p>
         </div>

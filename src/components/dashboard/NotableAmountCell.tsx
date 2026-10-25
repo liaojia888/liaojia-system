@@ -51,6 +51,7 @@ export function NotableAmountCell({
           disabled={disabled}
           value={formatNum(value)}
           onChange={(e) => onValueChange(parseNum(e.target.value))}
+          data-ledger-field={noteKey}
           className="ledger-input text-right tabular-nums disabled:bg-slate-50 disabled:text-slate-400"
           placeholder={placeholder}
         />

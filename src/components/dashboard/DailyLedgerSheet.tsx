@@ -1,13 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
-  LEDGER_STORAGE_KEY,
   computeRows,
   computeTotals,
   createEmptyRow,
-  defaultRowsForMonth,
-  normalizeRow,
   sortRowsByDate,
   FPS_CHANNEL_OPTIONS,
   isLedgerRowActive,
@@ -30,6 +27,9 @@ import {
   openWhatsAppShare,
 } from "@/lib/whatsapp-export";
 import { DailyLedgerMobileRows } from "@/components/dashboard/DailyLedgerMobileRows";
+import { LogoutButton } from "@/components/layout/LogoutButton";
+import { useLedgerMonthData } from "@/hooks/useLedgerMonthData";
+import { buildMonthCsv, downloadTextFile } from "@/lib/ledger-export";
 
 function formatNum(n: number): string {
   if (!n) return "";
@@ -41,36 +41,8 @@ function parseNum(raw: string): number {
   return Number.isFinite(v) ? v : 0;
 }
 
-type StoredLedger = {
-  monthKey: string;
-  rows: DailyLedgerRow[];
-};
-
 function monthKey(year: number, month: number) {
   return `${year}-${String(month).padStart(2, "0")}`;
-}
-
-function loadStored(month: string): DailyLedgerRow[] | null {
-  try {
-    const raw = localStorage.getItem(LEDGER_STORAGE_KEY);
-    if (!raw) return null;
-    const all = JSON.parse(raw) as Record<string, StoredLedger>;
-    const rows = all[month]?.rows;
-    return rows?.map((r) => normalizeRow(r as Record<string, unknown>)) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function saveStored(month: string, rows: DailyLedgerRow[]) {
-  try {
-    const raw = localStorage.getItem(LEDGER_STORAGE_KEY);
-    const all = raw ? (JSON.parse(raw) as Record<string, StoredLedger>) : {};
-    all[month] = { monthKey: month, rows };
-    localStorage.setItem(LEDGER_STORAGE_KEY, JSON.stringify(all));
-  } catch {
-    // ignore quota errors
-  }
 }
 
 const REVENUE_FIELDS = ["fuel", "water", "urea"] as const;
@@ -81,12 +53,14 @@ const OTHER_PAYMENT_FIELDS = [
   "expenses",
 ] as const;
 
-export function DailyLedgerSheet() {
+export function DailyLedgerSheet({
+  organizationId,
+}: {
+  organizationId: string | null;
+}) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
-  const [rows, setRows] = useState<DailyLedgerRow[]>([]);
-  const [ready, setReady] = useState(false);
   const [showAllNotes, setShowAllNotes] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [noteEditor, setNoteEditor] = useState<
@@ -95,20 +69,21 @@ export function DailyLedgerSheet() {
 
   const key = monthKey(year, month);
 
-  useEffect(() => {
-    const stored = loadStored(key);
-    if (stored?.length) {
-      setRows(sortRowsByDate(stored));
-    } else {
-      setRows(defaultRowsForMonth(year, month));
-    }
-    setReady(true);
-  }, [key, year, month]);
-
-  useEffect(() => {
-    if (!ready || rows.length === 0) return;
-    saveStored(key, rows);
-  }, [rows, key, ready]);
+  const {
+    rows,
+    setRows,
+    ready,
+    syncStatus,
+    syncMessage,
+    cloudConflict,
+    applyCloudVersion,
+    reloadMonth,
+  } = useLedgerMonthData({
+    monthKey: key,
+    year,
+    month,
+    organizationId,
+  });
 
   const computed = useMemo(() => computeRows(sortRowsByDate(rows)), [rows]);
   const totals = useMemo(() => computeTotals(computed), [computed]);
@@ -231,8 +206,27 @@ export function DailyLedgerSheet() {
     const d = new Date(year, month - 1 + delta, 1);
     setYear(d.getFullYear());
     setMonth(d.getMonth() + 1);
-    setReady(false);
   };
+
+  const syncLabel =
+    syncStatus === "loading"
+      ? "載入中…"
+      : syncStatus === "syncing"
+        ? "同步至雲端…"
+        : syncStatus === "synced"
+          ? "已與 Supabase 同步"
+          : syncStatus === "local_only"
+            ? "僅本機（未連公司）"
+            : syncStatus === "conflict"
+              ? "雲端版本較新"
+              : syncStatus === "error"
+                ? "同步失敗"
+                : "";
+
+  function exportCsv() {
+    const csv = buildMonthCsv(key, sortRowsByDate(rows), computed);
+    downloadTextFile(`日結-${key}.csv`, csv, "text/csv;charset=utf-8");
+  }
 
   if (!ready) {
     return (
@@ -243,16 +237,19 @@ export function DailyLedgerSheet() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[#f3f6fb]">
-      <header className="border-b border-slate-200 bg-white px-3 py-3 shadow-sm sm:px-4 sm:py-4 lg:px-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+    <div className="ledger-workspace flex min-h-0 flex-1 flex-col">
+      <header className="ledger-hero rounded-b-2xl px-3 py-4 sm:px-5 sm:py-5 lg:px-8 lg:py-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
-              日結工作台
+            <p className="ledger-hero-kicker text-[10px] font-bold uppercase tracking-[0.25em] sm:text-xs">
+              Daily Ledger
             </p>
-            <h1 className="text-lg font-semibold text-slate-900 sm:text-xl lg:text-2xl">
-              {year} 年 {month} 月 · 營收對帳表
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+              {year} 年 {month} 月
             </h1>
+            <p className="mt-0.5 text-sm font-medium text-slate-600">
+              營收對帳表
+            </p>
             <p className="mt-1 max-w-2xl text-xs text-slate-600 sm:text-sm">
               <span className="lg:hidden">
                 手機／平板：每列「列操作」或「＋備註」；電腦可右鍵操作。
@@ -261,15 +258,28 @@ export function DailyLedgerSheet() {
                 右鍵可新增／移除列、備註與清空該列；備註顯示在格內右上角。
               </span>
             </p>
+            {syncLabel ? (
+              <p className="mt-2 text-xs font-medium text-[var(--theme-accent-strong)]">
+                {syncLabel}
+                {syncMessage ? ` · ${syncMessage}` : null}
+              </p>
+            ) : null}
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={exportCsv}
+              className="ledger-touch-btn ledger-btn-ghost rounded-full px-4 py-2.5 text-sm font-medium shadow-sm sm:py-2"
+            >
+              匯出 CSV
+            </button>
             <button
               type="button"
               onClick={() => setShowAllNotes((v) => !v)}
-              className={`ledger-touch-btn rounded-lg border px-3 py-2.5 text-sm sm:py-2 ${
+              className={`ledger-touch-btn rounded-full px-4 py-2.5 text-sm font-medium shadow-sm transition sm:py-2 ${
                 showAllNotes
-                  ? "border-amber-300 bg-amber-50 text-amber-900"
-                  : "border-slate-300 bg-white hover:bg-slate-50"
+                  ? "border border-amber-300/80 bg-amber-50 text-amber-900"
+                  : "ledger-btn-ghost"
               }`}
             >
               {showAllNotes ? "隱藏備註" : "顯示備註"}
@@ -277,21 +287,49 @@ export function DailyLedgerSheet() {
             <button
               type="button"
               onClick={() => shiftMonth(-1)}
-              className="ledger-touch-btn rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm hover:bg-slate-50 sm:py-2"
+              className="ledger-touch-btn ledger-btn-ghost rounded-full px-4 py-2.5 text-sm font-medium shadow-sm sm:py-2"
             >
-              上個月
+              ← 上個月
             </button>
             <button
               type="button"
               onClick={() => shiftMonth(1)}
-              className="col-span-2 ledger-touch-btn rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm hover:bg-slate-50 sm:col-span-1 sm:py-2"
+              className="ledger-touch-btn ledger-btn-ghost rounded-full px-4 py-2.5 text-sm font-medium shadow-sm sm:py-2"
             >
-              下個月
+              下個月 →
             </button>
+            <LogoutButton
+              label="登出"
+              className="ledger-touch-btn ledger-btn-primary rounded-full px-4 py-2.5 text-sm font-medium shadow-sm sm:py-2"
+            />
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3 lg:grid-cols-4">
+        {cloudConflict ? (
+          <div className="mt-4 flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between">
+            <p>
+              其他裝置或使用者已更新此月份。請選擇載入雲端版本，或先備份後再覆寫。
+            </p>
+            <div className="flex shrink-0 gap-2">
+              <button
+                type="button"
+                onClick={() => void reloadMonth()}
+                className="rounded-full border border-amber-400 px-3 py-1.5 text-xs font-medium"
+              >
+                重新載入
+              </button>
+              <button
+                type="button"
+                onClick={applyCloudVersion}
+                className="rounded-full bg-amber-800 px-3 py-1.5 text-xs font-medium text-white"
+              >
+                使用雲端資料
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <SummaryChip label="總收入" value={totals.totalRevenue} accent />
           <SummaryChip label="總支出" value={totals.expenses} />
           <SummaryChip label="待入銀行合計" value={totals.bankPending} />
@@ -299,7 +337,7 @@ export function DailyLedgerSheet() {
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-auto p-2 sm:p-3 lg:p-4">
+      <div className="min-h-0 flex-1 overflow-auto p-3 sm:p-4 lg:p-6">
         <div className="lg:hidden">
           <DailyLedgerMobileRows
             rows={computed}
@@ -320,18 +358,18 @@ export function DailyLedgerSheet() {
           <p className="mb-2 text-center text-xs text-slate-500 xl:hidden">
             ← 左右滑動可查看更多欄位 →
           </p>
-          <div className="ledger-table-scroll overflow-x-auto overscroll-x-contain rounded-lg border border-slate-300 bg-white shadow-sm">
+          <div className="ledger-table-scroll ledger-table-shell overflow-x-auto overscroll-x-contain rounded-2xl bg-white">
           <div className="inline-block min-w-full align-top">
           <table className="w-full min-w-[1100px] border-collapse text-sm">
             <thead>
-              <tr className="bg-[#217346] text-white">
+              <tr className="ledger-thead-row-main">
                 <th rowSpan={2} className="ledger-th ledger-sticky-col sticky left-0 z-20 min-w-[7.5rem]">
                   日期
                 </th>
                 <th colSpan={3} className="ledger-th">
                   收入明細
                 </th>
-                <th rowSpan={2} className="ledger-th min-w-[5.5rem] bg-[#1a5c38]">
+                <th rowSpan={2} className="ledger-th ledger-th-accent min-w-[5.5rem]">
                   品項小計
                 </th>
                 <th colSpan={2} className="ledger-th">
@@ -355,11 +393,11 @@ export function DailyLedgerSheet() {
                 <th rowSpan={2} className="ledger-th">
                   支出
                 </th>
-                <th rowSpan={2} className="ledger-th min-w-[5.5rem] bg-[#1a5c38]">
+                <th rowSpan={2} className="ledger-th ledger-th-accent min-w-[5.5rem]">
                   尾數
                 </th>
               </tr>
-              <tr className="bg-[#1e6b41] text-white">
+              <tr className="ledger-thead-row-sub">
                 <th className="ledger-th-sub">油</th>
                 <th className="ledger-th-sub">水</th>
                 <th className="ledger-th-sub">尿素</th>
@@ -369,7 +407,11 @@ export function DailyLedgerSheet() {
             </thead>
             <tbody>
               {computed.map((row) => (
-                <tr key={row.id} className="group hover:bg-emerald-50/40">
+                <tr
+                  key={row.id}
+                  data-ledger-date={row.date}
+                  className="group hover:bg-emerald-50/40"
+                >
                   <td
                     className="ledger-td ledger-sticky-col sticky left-0 z-10 bg-white group-hover:bg-emerald-50/40"
                     onContextMenu={(e) => openRowContextMenu(e, row.id)}
@@ -630,16 +672,16 @@ function SummaryChip({
 }) {
   return (
     <div
-      className={`rounded-xl border px-4 py-3 ${
+      className={`rounded-2xl border px-4 py-3.5 shadow-sm backdrop-blur-sm ${
         accent
-          ? "border-emerald-200 bg-emerald-50"
-          : "border-slate-200 bg-slate-50"
+          ? "ledger-stat-accent"
+          : "border-white/60 bg-white/70"
       }`}
     >
-      <p className="text-xs text-slate-600">{label}</p>
+      <p className="text-xs font-medium text-slate-600">{label}</p>
       <p
-        className={`mt-1 text-lg font-semibold tabular-nums ${
-          accent ? "text-emerald-900" : "text-slate-900"
+        className={`ledger-stat-value mt-1 text-xl font-semibold tabular-nums ${
+          accent ? "" : "text-slate-900"
         }`}
       >
         {value.toLocaleString("zh-TW", {

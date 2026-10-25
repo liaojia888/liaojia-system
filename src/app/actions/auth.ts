@@ -6,6 +6,13 @@ import { createClient } from "@/lib/supabase/server";
 import { ensureOrganizationForUser } from "@/lib/organization";
 import { getAppUrl } from "@/lib/app-url";
 import { translateAuthError } from "@/lib/supabase/auth-messages";
+import {
+  checkRateLimit,
+  rateLimitMessage,
+} from "@/lib/rate-limit";
+import { getRequestClientKey } from "@/lib/request-client-key";
+
+const AUTH_WINDOW_MS = 15 * 60 * 1000;
 
 export async function signIn(
   _prev: { error: string | null; notice: string | null } | void,
@@ -13,6 +20,16 @@ export async function signIn(
 ) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+
+  const clientKey = await getRequestClientKey("sign-in");
+  const limited = checkRateLimit(
+    `${clientKey}:${email.toLowerCase()}`,
+    12,
+    AUTH_WINDOW_MS,
+  );
+  if (!limited.ok) {
+    return { error: rateLimitMessage(limited.retryAfterSec), notice: null };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -46,6 +63,12 @@ export async function signUp(
   const password = String(formData.get("password") ?? "");
   const fullName = String(formData.get("fullName") ?? "").trim();
   const orgName = String(formData.get("orgName") ?? "").trim() || "我的公司";
+
+  const clientKey = await getRequestClientKey("sign-up");
+  const limited = checkRateLimit(`${clientKey}:${email.toLowerCase()}`, 6, AUTH_WINDOW_MS);
+  if (!limited.ok) {
+    return { error: rateLimitMessage(limited.retryAfterSec), notice: null };
+  }
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
@@ -88,6 +111,16 @@ export async function requestPasswordReset(
   const email = String(formData.get("email") ?? "").trim();
   if (!email) {
     return { error: "請輸入 Email。", notice: null };
+  }
+
+  const clientKey = await getRequestClientKey("password-reset");
+  const limited = checkRateLimit(
+    `${clientKey}:${email.toLowerCase()}`,
+    5,
+    AUTH_WINDOW_MS,
+  );
+  if (!limited.ok) {
+    return { error: rateLimitMessage(limited.retryAfterSec), notice: null };
   }
 
   const supabase = await createClient();
@@ -141,6 +174,50 @@ export async function updatePassword(
   await ensureOrganizationForUser("我的公司");
   revalidatePath("/", "layout");
   redirect("/dashboard");
+}
+
+export async function resendVerificationEmail(
+  _prev: { error: string | null; notice: string | null } | void,
+  formData: FormData,
+) {
+  const emailFromForm = String(formData.get("email") ?? "").trim();
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const email = emailFromForm || user?.email || "";
+  if (!email) {
+    return { error: "請輸入 Email。", notice: null };
+  }
+
+  const clientKey = await getRequestClientKey("resend-verify");
+  const limited = checkRateLimit(
+    `${clientKey}:${email.toLowerCase()}`,
+    3,
+    AUTH_WINDOW_MS,
+  );
+  if (!limited.ok) {
+    return { error: rateLimitMessage(limited.retryAfterSec), notice: null };
+  }
+
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: {
+      emailRedirectTo: `${getAppUrl()}/auth/callback`,
+    },
+  });
+
+  if (error) {
+    return { error: translateAuthError(error.message), notice: null };
+  }
+
+  return {
+    error: null,
+    notice:
+      "已重新寄出驗證信（若帳號存在且尚未驗證）。請查看收件匣與垃圾郵件，並在 Supabase 設定的有效時間內點擊連結。",
+  };
 }
 
 export async function signOut() {

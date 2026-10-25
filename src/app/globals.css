@@ -25,8 +25,416 @@ body {
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 
+.app-sidebar {
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
+  box-shadow: 4px 0 28px var(--sidebar-shadow);
+}
+
+.sidebar-glow {
+  background: var(--sidebar-glow);
+}
+
+.sidebar-brand {
+  color: var(--sidebar-brand);
+}
+
+.sidebar-toggle {
+  border-color: var(--sidebar-toggle-border);
+  background: var(--sidebar-toggle-bg);
+  color: var(--sidebar-muted);
+}
+
+.sidebar-toggle:hover {
+  border-color: var(--sidebar-toggle-hover-border);
+  background: var(--sidebar-toggle-hover-bg);
+  color: var(--sidebar-brand);
+}
+
+.sidebar-nav-link {
+  color: var(--sidebar-muted);
+}
+
+.sidebar-nav-link:hover {
+  background: var(--sidebar-nav-hover-bg);
+  color: white;
+}
+
+.sidebar-nav-link-active {
+  background: var(--sidebar-nav-active-bg);
+  color: white;
+  box-shadow: inset 0 0 0 1px var(--sidebar-nav-active-ring);
+}
+
+.sidebar-nav-icon {
+  color: var(--sidebar-icon);
+}
+
+.sidebar-nav-link:hover .sidebar-nav-icon {
+  color: var(--sidebar-brand);
+}
+
+.sidebar-nav-link-active .sidebar-nav-icon {
+  color: var(--sidebar-brand);
+}
+
+.sidebar-nav-dot {
+  background: var(--theme-accent);
+  box-shadow: 0 0 10px var(--sidebar-nav-dot-glow);
+}
+
+.sidebar-divider {
+  border-color: var(--sidebar-border);
+}
+
+.sidebar-logout {
+  border-color: var(--sidebar-toggle-border);
+  background: var(--sidebar-toggle-bg);
+  color: var(--sidebar-muted);
+}
+
+.sidebar-org-badge {
+  background: var(--sidebar-org-badge-bg);
+  color: var(--sidebar-brand);
+  box-shadow: inset 0 0 0 1px var(--sidebar-org-badge-ring);
+}
+
+/* —— App themes —— */
+html[data-app-theme="emerald"] {
+  --theme-accent: #10b981;
+  --theme-accent-strong: #047857;
+  --theme-accent-soft: #d1fae5;
+  --sidebar-bg: linear-gradient(165deg, #0b1f18 0%, #071612 48%, #0c1220 100%);
+  --sidebar-border: rgb(110 231 183 / 0.12);
+  --sidebar-shadow: rgb(6 78 59 / 0.12);
+  --sidebar-glow: rgb(16 185 129 / 0.28);
+  --sidebar-brand: #6ee7b7;
+  --sidebar-muted: #94a3b8;
+  --sidebar-icon: #64748b;
+  --sidebar-nav-hover-bg: rgb(255 255 255 / 0.05);
+  --sidebar-nav-active-bg: linear-gradient(
+    90deg,
+    rgb(16 185 129 / 0.22),
+    rgb(45 212 191 / 0.08)
+  );
+  --sidebar-nav-active-ring: rgb(52 211 153 / 0.38);
+  --sidebar-nav-dot-glow: rgb(52 211 153 / 0.85);
+  --sidebar-toggle-border: rgb(255 255 255 / 0.1);
+  --sidebar-toggle-bg: rgb(255 255 255 / 0.05);
+  --sidebar-toggle-hover-border: rgb(110 231 183 / 0.45);
+  --sidebar-toggle-hover-bg: rgb(255 255 255 / 0.08);
+  --sidebar-org-badge-bg: rgb(16 185 129 / 0.18);
+  --sidebar-org-badge-ring: rgb(110 231 183 / 0.35);
+  --app-shell-bg: #eef1f6;
+  --ledger-page-bg: linear-gradient(180deg, #f0f4f8 0%, #e8eef5 100%);
+  --ledger-hero-bg: linear-gradient(135deg, #ffffff 0%, #f0fdf4 55%, #ecfdf5 100%);
+  --ledger-thead: #217346;
+  --ledger-thead-sub: #1e6b41;
+  --ledger-thead-accent: #1a5c38;
+  --ledger-thead-border: #1a5c38;
+  --ledger-input-focus: #10b981;
+  --ledger-stat-accent-bg: #ecfdf5;
+  --ledger-stat-accent-border: #a7f3d0;
+  --ledger-stat-accent-text: #065f46;
+}
+
+html[data-app-theme="ocean"] {
+  --theme-accent: #3b82f6;
+  --theme-accent-strong: #1d4ed8;
+  --theme-accent-soft: #dbeafe;
+  --sidebar-bg: linear-gradient(165deg, #0a1628 0%, #071222 48%, #0c1220 100%);
+  --sidebar-border: rgb(147 197 253 / 0.14);
+  --sidebar-shadow: rgb(30 64 175 / 0.14);
+  --sidebar-glow: rgb(59 130 246 / 0.3);
+  --sidebar-brand: #93c5fd;
+  --sidebar-muted: #94a3b8;
+  --sidebar-icon: #64748b;
+  --sidebar-nav-hover-bg: rgb(255 255 255 / 0.05);
+  --sidebar-nav-active-bg: linear-gradient(
+    90deg,
+    rgb(59 130 246 / 0.24),
+    rgb(37 99 235 / 0.1)
+  );
+  --sidebar-nav-active-ring: rgb(96 165 250 / 0.4);
+  --sidebar-nav-dot-glow: rgb(59 130 246 / 0.85);
+  --sidebar-toggle-border: rgb(255 255 255 / 0.1);
+  --sidebar-toggle-bg: rgb(255 255 255 / 0.05);
+  --sidebar-toggle-hover-border: rgb(147 197 253 / 0.45);
+  --sidebar-toggle-hover-bg: rgb(255 255 255 / 0.08);
+  --sidebar-org-badge-bg: rgb(59 130 246 / 0.2);
+  --sidebar-org-badge-ring: rgb(147 197 253 / 0.35);
+  --app-shell-bg: #eef2f8;
+  --ledger-page-bg: linear-gradient(180deg, #eff6ff 0%, #e2e8f0 100%);
+  --ledger-hero-bg: linear-gradient(135deg, #ffffff 0%, #eff6ff 55%, #dbeafe 100%);
+  --ledger-thead: #1e40af;
+  --ledger-thead-sub: #1d4ed8;
+  --ledger-thead-accent: #1e3a8a;
+  --ledger-thead-border: #1e3a8a;
+  --ledger-input-focus: #3b82f6;
+  --ledger-stat-accent-bg: #eff6ff;
+  --ledger-stat-accent-border: #bfdbfe;
+  --ledger-stat-accent-text: #1e3a8a;
+}
+
+html[data-app-theme="violet"] {
+  --theme-accent: #8b5cf6;
+  --theme-accent-strong: #6d28d9;
+  --theme-accent-soft: #ede9fe;
+  --sidebar-bg: linear-gradient(165deg, #150d28 0%, #110a22 48%, #0c1220 100%);
+  --sidebar-border: rgb(196 181 253 / 0.14);
+  --sidebar-shadow: rgb(91 33 182 / 0.16);
+  --sidebar-glow: rgb(139 92 246 / 0.32);
+  --sidebar-brand: #c4b5fd;
+  --sidebar-muted: #94a3b8;
+  --sidebar-icon: #64748b;
+  --sidebar-nav-hover-bg: rgb(255 255 255 / 0.05);
+  --sidebar-nav-active-bg: linear-gradient(
+    90deg,
+    rgb(139 92 246 / 0.26),
+    rgb(124 58 237 / 0.1)
+  );
+  --sidebar-nav-active-ring: rgb(167 139 250 / 0.42);
+  --sidebar-nav-dot-glow: rgb(139 92 246 / 0.85);
+  --sidebar-toggle-border: rgb(255 255 255 / 0.1);
+  --sidebar-toggle-bg: rgb(255 255 255 / 0.05);
+  --sidebar-toggle-hover-border: rgb(196 181 253 / 0.45);
+  --sidebar-toggle-hover-bg: rgb(255 255 255 / 0.08);
+  --sidebar-org-badge-bg: rgb(139 92 246 / 0.22);
+  --sidebar-org-badge-ring: rgb(196 181 253 / 0.35);
+  --app-shell-bg: #f1eef8;
+  --ledger-page-bg: linear-gradient(180deg, #f5f3ff 0%, #e9e5f5 100%);
+  --ledger-hero-bg: linear-gradient(135deg, #ffffff 0%, #f5f3ff 55%, #ede9fe 100%);
+  --ledger-thead: #5b21b6;
+  --ledger-thead-sub: #6d28d9;
+  --ledger-thead-accent: #4c1d95;
+  --ledger-thead-border: #4c1d95;
+  --ledger-input-focus: #8b5cf6;
+  --ledger-stat-accent-bg: #f5f3ff;
+  --ledger-stat-accent-border: #ddd6fe;
+  --ledger-stat-accent-text: #5b21b6;
+}
+
+html[data-app-theme="sunset"] {
+  --theme-accent: #f97316;
+  --theme-accent-strong: #c2410c;
+  --theme-accent-soft: #ffedd5;
+  --sidebar-bg: linear-gradient(165deg, #221108 0%, #1a0d06 48%, #141018 100%);
+  --sidebar-border: rgb(253 186 116 / 0.16);
+  --sidebar-shadow: rgb(194 65 12 / 0.14);
+  --sidebar-glow: rgb(249 115 22 / 0.28);
+  --sidebar-brand: #fdba74;
+  --sidebar-muted: #a8a29e;
+  --sidebar-icon: #78716c;
+  --sidebar-nav-hover-bg: rgb(255 255 255 / 0.05);
+  --sidebar-nav-active-bg: linear-gradient(
+    90deg,
+    rgb(249 115 22 / 0.26),
+    rgb(234 88 12 / 0.1)
+  );
+  --sidebar-nav-active-ring: rgb(251 146 60 / 0.42);
+  --sidebar-nav-dot-glow: rgb(249 115 22 / 0.85);
+  --sidebar-toggle-border: rgb(255 255 255 / 0.1);
+  --sidebar-toggle-bg: rgb(255 255 255 / 0.05);
+  --sidebar-toggle-hover-border: rgb(253 186 116 / 0.45);
+  --sidebar-toggle-hover-bg: rgb(255 255 255 / 0.08);
+  --sidebar-org-badge-bg: rgb(249 115 22 / 0.2);
+  --sidebar-org-badge-ring: rgb(253 186 116 / 0.35);
+  --app-shell-bg: #f6f0ea;
+  --ledger-page-bg: linear-gradient(180deg, #fff7ed 0%, #f1e8df 100%);
+  --ledger-hero-bg: linear-gradient(135deg, #ffffff 0%, #fff7ed 55%, #ffedd5 100%);
+  --ledger-thead: #c2410c;
+  --ledger-thead-sub: #ea580c;
+  --ledger-thead-accent: #9a3412;
+  --ledger-thead-border: #9a3412;
+  --ledger-input-focus: #f97316;
+  --ledger-stat-accent-bg: #fff7ed;
+  --ledger-stat-accent-border: #fed7aa;
+  --ledger-stat-accent-text: #9a3412;
+}
+
+html[data-app-theme="graphite"] {
+  --theme-accent: #64748b;
+  --theme-accent-strong: #334155;
+  --theme-accent-soft: #e2e8f0;
+  --sidebar-bg: linear-gradient(165deg, #1a1f26 0%, #12161c 48%, #0f1419 100%);
+  --sidebar-border: rgb(148 163 184 / 0.14);
+  --sidebar-shadow: rgb(15 23 42 / 0.12);
+  --sidebar-glow: rgb(100 116 139 / 0.22);
+  --sidebar-brand: #cbd5e1;
+  --sidebar-muted: #94a3b8;
+  --sidebar-icon: #64748b;
+  --sidebar-nav-hover-bg: rgb(255 255 255 / 0.05);
+  --sidebar-nav-active-bg: linear-gradient(
+    90deg,
+    rgb(100 116 139 / 0.28),
+    rgb(71 85 105 / 0.12)
+  );
+  --sidebar-nav-active-ring: rgb(148 163 184 / 0.38);
+  --sidebar-nav-dot-glow: rgb(148 163 184 / 0.75);
+  --sidebar-toggle-border: rgb(255 255 255 / 0.1);
+  --sidebar-toggle-bg: rgb(255 255 255 / 0.05);
+  --sidebar-toggle-hover-border: rgb(203 213 225 / 0.4);
+  --sidebar-toggle-hover-bg: rgb(255 255 255 / 0.08);
+  --sidebar-org-badge-bg: rgb(100 116 139 / 0.22);
+  --sidebar-org-badge-ring: rgb(203 213 225 / 0.28);
+  --app-shell-bg: #eceff3;
+  --ledger-page-bg: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+  --ledger-hero-bg: linear-gradient(135deg, #ffffff 0%, #f8fafc 55%, #f1f5f9 100%);
+  --ledger-thead: #334155;
+  --ledger-thead-sub: #475569;
+  --ledger-thead-accent: #1e293b;
+  --ledger-thead-border: #1e293b;
+  --ledger-input-focus: #64748b;
+  --ledger-stat-accent-bg: #f1f5f9;
+  --ledger-stat-accent-border: #cbd5e1;
+  --ledger-stat-accent-text: #334155;
+}
+
+html:not([data-app-theme]) {
+  --theme-accent: #10b981;
+  --theme-accent-strong: #047857;
+  --theme-accent-soft: #d1fae5;
+  --sidebar-bg: linear-gradient(165deg, #0b1f18 0%, #071612 48%, #0c1220 100%);
+  --sidebar-border: rgb(110 231 183 / 0.12);
+  --sidebar-shadow: rgb(6 78 59 / 0.12);
+  --sidebar-glow: rgb(16 185 129 / 0.28);
+  --sidebar-brand: #6ee7b7;
+  --sidebar-muted: #94a3b8;
+  --sidebar-icon: #64748b;
+  --sidebar-nav-hover-bg: rgb(255 255 255 / 0.05);
+  --sidebar-nav-active-bg: linear-gradient(
+    90deg,
+    rgb(16 185 129 / 0.22),
+    rgb(45 212 191 / 0.08)
+  );
+  --sidebar-nav-active-ring: rgb(52 211 153 / 0.38);
+  --sidebar-nav-dot-glow: rgb(52 211 153 / 0.85);
+  --sidebar-toggle-border: rgb(255 255 255 / 0.1);
+  --sidebar-toggle-bg: rgb(255 255 255 / 0.05);
+  --sidebar-toggle-hover-border: rgb(110 231 183 / 0.45);
+  --sidebar-toggle-hover-bg: rgb(255 255 255 / 0.08);
+  --sidebar-org-badge-bg: rgb(16 185 129 / 0.18);
+  --sidebar-org-badge-ring: rgb(110 231 183 / 0.35);
+  --app-shell-bg: #eef1f6;
+  --ledger-page-bg: linear-gradient(180deg, #f0f4f8 0%, #e8eef5 100%);
+  --ledger-hero-bg: linear-gradient(135deg, #ffffff 0%, #f0fdf4 55%, #ecfdf5 100%);
+  --ledger-thead: #217346;
+  --ledger-thead-sub: #1e6b41;
+  --ledger-thead-accent: #1a5c38;
+  --ledger-thead-border: #1a5c38;
+  --ledger-input-focus: #10b981;
+  --ledger-stat-accent-bg: #ecfdf5;
+  --ledger-stat-accent-border: #a7f3d0;
+  --ledger-stat-accent-text: #065f46;
+}
+
+.app-shell {
+  background: var(--app-shell-bg);
+}
+
+.ledger-workspace {
+  background: var(--ledger-page-bg);
+}
+
+.ledger-hero {
+  background: var(--ledger-hero-bg);
+  border-bottom: 1px solid rgb(148 163 184 / 0.2);
+  box-shadow: 0 4px 24px rgb(15 23 42 / 0.04);
+}
+
+.ledger-hero-kicker {
+  color: var(--theme-accent-strong);
+}
+
+.ledger-btn-primary {
+  background: var(--theme-accent-strong);
+  color: white;
+  border: 1px solid transparent;
+}
+
+.ledger-btn-primary:hover {
+  filter: brightness(1.08);
+}
+
+.ledger-btn-ghost {
+  background: rgb(255 255 255 / 0.85);
+  border: 1px solid rgb(148 163 184 / 0.35);
+}
+
+.ledger-btn-ghost:hover {
+  background: white;
+}
+
+.ledger-table-shell {
+  border: 1px solid rgb(148 163 184 / 0.25);
+  box-shadow: 0 8px 32px rgb(15 23 42 / 0.06);
+}
+
+.ledger-thead-row-main {
+  background: var(--ledger-thead);
+  color: white;
+}
+
+.ledger-thead-row-sub {
+  background: var(--ledger-thead-sub);
+  color: white;
+}
+
+.ledger-th-accent {
+  background: var(--ledger-thead-accent) !important;
+}
+
+.ledger-stat-accent {
+  background: var(--ledger-stat-accent-bg);
+  border-color: var(--ledger-stat-accent-border);
+}
+
+.ledger-stat-accent .ledger-stat-value {
+  color: var(--ledger-stat-accent-text);
+}
+
+.report-page-card {
+  border: 1px solid rgb(148 163 184 / 0.22);
+  background: rgb(255 255 255 / 0.88);
+  box-shadow: 0 8px 28px rgb(15 23 42 / 0.05);
+  backdrop-filter: blur(6px);
+}
+
+.report-block-title {
+  color: var(--theme-accent-strong);
+}
+
+.report-row-accent {
+  color: var(--ledger-stat-accent-text);
+}
+
+.report-theme-link {
+  color: var(--theme-accent-strong);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.report-theme-link:hover {
+  color: var(--theme-accent);
+}
+
+.report-notes-panel {
+  border-color: color-mix(in srgb, var(--theme-accent) 35%, transparent);
+  background: color-mix(in srgb, var(--theme-accent-soft) 55%, white);
+}
+
+.report-note-item {
+  border-color: color-mix(in srgb, var(--theme-accent) 22%, transparent);
+  background: rgb(255 255 255 / 0.55);
+}
+
+.report-note-label {
+  color: var(--theme-accent-strong);
+}
+
 .ledger-th {
-  border: 1px solid #1a5c38;
+  border: 1px solid var(--ledger-thead-border);
   padding: 0.4rem 0.5rem;
   text-align: center;
   font-size: 0.75rem;
@@ -35,7 +443,7 @@ body {
 }
 
 .ledger-th-sub {
-  border: 1px solid #1a5c38;
+  border: 1px solid var(--ledger-thead-border);
   padding: 0.35rem 0.5rem;
   text-align: center;
   font-size: 0.7rem;
@@ -67,8 +475,8 @@ body {
 }
 
 .ledger-input:focus {
-  background: #ecfdf5;
-  box-shadow: inset 0 0 0 2px #10b981;
+  background: rgb(255 255 255 / 0.9);
+  box-shadow: inset 0 0 0 2px var(--ledger-input-focus);
 }
 
 .ledger-input:disabled:focus {
@@ -157,5 +565,41 @@ body {
 @media (min-width: 640px) {
   .ledger-touch-btn {
     min-height: auto;
+  }
+}
+
+.ledger-trend-bar {
+  background: linear-gradient(
+    180deg,
+    var(--theme-accent-strong) 0%,
+    var(--theme-accent) 100%
+  );
+}
+
+@media print {
+  .app-shell > .hidden,
+  .app-shell header,
+  .ledger-no-print,
+  .sidebar-toggle {
+    display: none !important;
+  }
+
+  .app-shell main {
+    padding: 0 !important;
+  }
+
+  .ledger-report-print {
+    break-inside: avoid;
+  }
+
+  .report-page-card,
+  .ledger-hero {
+    box-shadow: none !important;
+    border: 1px solid #cbd5e1 !important;
+  }
+
+  body {
+    background: white !important;
+    color: #0f172a !important;
   }
 }
