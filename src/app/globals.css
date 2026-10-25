@@ -603,3 +603,128 @@ html:not([data-app-theme]) {
     color: #0f172a !important;
   }
 }
+
+/* —— 登入／註冊 —— */
+.auth-page {
+  background: linear-gradient(165deg, #f8fafc 0%, #ecfdf5 45%, #f1f5f9 100%);
+}
+
+.auth-page-brand {
+  background: linear-gradient(145deg, #052e22 0%, #0b4a36 42%, #064e3b 100%);
+}
+
+.auth-page-brand-glow {
+  background: radial-gradient(circle, rgba(110, 231, 183, 0.35) 0%, transparent 70%);
+}
+
+.auth-page-main {
+  background: transparent;
+}
+
+.auth-card-header {
+  border-bottom: 1px solid rgb(241 245 249 / 0.9);
+}
+
+.auth-input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid rgb(203 213 225);
+  background: rgb(248 250 252 / 0.8);
+  padding: 0.625rem 0.875rem;
+  color: rgb(15 23 42);
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.auth-input::placeholder {
+  color: rgb(148 163 184);
+}
+
+.auth-input:focus {
+  border-color: rgb(16 185 129);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgb(16 185 129 / 0.15);
+}
+
+.auth-btn-primary {
+  width: 100%;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fff;
+  box-shadow: 0 10px 24px -12px rgb(4 120 87 / 0.65);
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    opacity 0.12s ease;
+}
+
+.auth-btn-primary:hover:not(:disabled) {
+  box-shadow: 0 14px 28px -12px rgb(4 120 87 / 0.75);
+}
+
+.auth-btn-primary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.auth-btn-primary:disabled {
+  opacity: 0.65;
+}
+
+.auth-btn-secondary {
+  border-radius: 0.75rem;
+  border: 1px solid rgb(203 213 225);
+  background: #fff;
+  font-weight: 500;
+  color: rgb(51 65 85);
+  transition: background-color 0.12s ease;
+}
+
+.auth-btn-secondary:hover:not(:disabled) {
+  background: rgb(248 250 252);
+}
+
+.auth-alert {
+  border-radius: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.auth-alert-success {
+  background: rgb(236 253 245);
+  color: rgb(6 95 70);
+  border: 1px solid rgb(167 243 208);
+}
+
+.auth-alert-warning {
+  background: rgb(255 251 235);
+  color: rgb(146 64 14);
+  border: 1px solid rgb(253 230 138);
+}
+
+.auth-alert-error {
+  background: rgb(254 242 242);
+  color: rgb(185 28 28);
+  border: 1px solid rgb(254 202 202);
+}
+
+.auth-link {
+  color: rgb(5 150 105);
+  text-underline-offset: 3px;
+  transition: color 0.12s ease;
+}
+
+.auth-link:hover {
+  color: rgb(4 120 87);
+  text-decoration: underline;
+}
+
+.auth-card-footer {
+  background: rgb(248 250 252 / 0.65);
+}

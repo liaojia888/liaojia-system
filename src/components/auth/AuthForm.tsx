@@ -30,30 +30,30 @@ export function AuthForm({
   } satisfies AuthState);
 
   return (
-    <div className="mx-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-      <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
-      <p className="mt-2 text-sm text-slate-600">{subtitle}</p>
-      <form action={formAction} className="mt-8 space-y-4">
+    <div className="auth-card overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_20px_50px_-24px_rgba(15,23,42,0.35)]">
+      <div className="auth-card-header px-8 pb-1 pt-8 sm:px-9 sm:pt-9">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+          {title}
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-slate-600">{subtitle}</p>
+      </div>
+      <form action={formAction} className="space-y-4 px-8 pb-8 pt-6 sm:px-9 sm:pb-9">
         {fields}
         {state?.notice ? (
-          <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-            {state.notice}
-          </p>
+          <p className="auth-alert auth-alert-success">{state.notice}</p>
         ) : null}
         {state?.error ? (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-            {state.error}
-          </p>
+          <p className="auth-alert auth-alert-error">{state.error}</p>
         ) : null}
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-full rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
-        >
+        <button type="submit" disabled={pending} className="auth-btn-primary">
           {pending ? "處理中…" : submitLabel}
         </button>
       </form>
-      {footer ? <div className="mt-6 text-center text-sm">{footer}</div> : null}
+      {footer ? (
+        <div className="auth-card-footer border-t border-slate-100 px-8 py-5 text-center text-sm sm:px-9">
+          {footer}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -73,14 +73,37 @@ export function Field({
 }) {
   return (
     <label className="block text-sm">
-      <span className="mb-1.5 block font-medium text-slate-700">{label}</span>
+      <span className="mb-1.5 block font-medium text-slate-800">{label}</span>
       <input
         name={name}
         type={type}
         required={required}
         placeholder={placeholder}
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none ring-slate-400 focus:ring-2"
+        autoComplete={
+          type === "password"
+            ? "current-password"
+            : type === "email"
+              ? "email"
+              : undefined
+        }
+        className="auth-input"
       />
     </label>
+  );
+}
+
+export function AuthAlert({
+  variant,
+  children,
+}: {
+  variant: "success" | "warning";
+  children: React.ReactNode;
+}) {
+  return (
+    <p
+      className={`auth-alert mb-4 ${variant === "success" ? "auth-alert-success" : "auth-alert-warning"}`}
+    >
+      {children}
+    </p>
   );
 }
