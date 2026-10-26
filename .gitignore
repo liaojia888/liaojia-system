@@ -17,6 +17,11 @@
 /blob-report
 /playwright/.cache
 
+# Serwist
+/public/sw.js
+/public/sw.js.map
+/public/swe-worker*.js
+
 # next.js
 /.next/
 /out/

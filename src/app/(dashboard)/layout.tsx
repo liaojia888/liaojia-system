@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/layout/AppShell";
+import { InstallPwaHint } from "@/components/pwa/InstallPwaHint";
 import { AppThemeProvider } from "@/components/providers/AppThemeProvider";
 import { themeFromUserMetadata } from "@/lib/app-theme";
 import { ensureOrganizationForUser } from "@/lib/organization";
@@ -28,6 +29,7 @@ export default async function DashboardLayout({
   return (
     <AppThemeProvider initialThemeFromAccount={initialThemeFromAccount}>
       <AppShell orgName={orgDisplayName} organizationId={organizationId}>
+        <InstallPwaHint />
         {children}
       </AppShell>
     </AppThemeProvider>

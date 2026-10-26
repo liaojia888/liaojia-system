@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "node --max-http-header-size=65536 ./node_modules/next/dist/bin/next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "node --max-http-header-size=65536 ./node_modules/next/dist/bin/next start",
     "lint": "eslint",
     "test": "npm run test:unit",
@@ -14,6 +14,7 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
+    "@serwist/next": "^9.5.13",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
     "next": "16.3.8",
@@ -28,6 +29,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
+    "serwist": "^9.5.13",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^2.1.9"
