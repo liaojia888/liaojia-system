@@ -206,8 +206,8 @@ export function MonthlyLedgerReport({
   }
 
   const syncHint =
-    syncStatus === "loading"
-      ? "載入 Supabase 資料…"
+    syncStatus === "syncing"
+      ? "寫入 Supabase…"
       : view === "year" && yearLoadingCloud
         ? "載入年度 Supabase 資料…"
         : null;

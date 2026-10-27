@@ -282,9 +282,7 @@ export function DailyLedgerSheet({
   };
 
   const syncLabel =
-    syncStatus === "loading"
-      ? "載入中…"
-      : syncStatus === "syncing"
+    syncStatus === "syncing"
         ? "寫入 Supabase…"
         : syncStatus === "synced"
           ? "已寫入 Supabase"
@@ -343,7 +341,7 @@ export function DailyLedgerSheet({
               </span>
               {organizationId ? (
                 <span className="mt-1 block text-[var(--theme-accent-strong)]">
-                  編輯會自動存本機；寫入 Supabase 資料庫請按「儲存至 Supabase」。
+                  不會自動連 Supabase；編輯只存本機，要備份到資料庫請按「儲存至 Supabase」。
                 </span>
               ) : null}
             </p>
