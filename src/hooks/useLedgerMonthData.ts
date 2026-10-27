@@ -177,7 +177,7 @@ export function useLedgerMonthData({
   );
 
   const reloadFromLocalCache = useCallback(() => {
-    if (shareLockRef.current) return;
+    if (shareLockRef.current || cloudDirtyRef.current) return;
     const local = loadLocalMonth(monthKey);
     if (!local?.length) return;
     setRows((prev) =>
@@ -185,6 +185,7 @@ export function useLedgerMonthData({
     );
   }, [monthKey]);
 
+  /** 僅在切換月份時從本機載入，避免 loadMonth 重跑時蓋掉正在編輯的列 */
   useEffect(() => {
     setRows(rowsForMonthKey(monthKey, year, month));
     remoteUpdatedAtRef.current = null;
@@ -193,8 +194,16 @@ export function useLedgerMonthData({
     markCloudClean();
     setCloudConflict(null);
     setSyncMessage(null);
+  }, [monthKey, year, month]);
+
+  useEffect(() => {
+    if (!organizationId) {
+      remoteUpdatedAtRef.current = null;
+      setSyncStatus("local_only");
+      return;
+    }
     void loadMonth("initial");
-  }, [loadMonth, monthKey, year, month]);
+  }, [loadMonth, organizationId]);
 
   useEffect(() => {
     return subscribeLedgerSync((msg) => {
