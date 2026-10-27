@@ -1,8 +1,10 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { InstallPwaHint } from "@/components/pwa/InstallPwaHint";
 import { AppThemeProvider } from "@/components/providers/AppThemeProvider";
+import { LedgerLayoutProvider } from "@/components/providers/LedgerLayoutProvider";
 import { ServerActionSyncGuard } from "@/components/providers/ServerActionSyncGuard";
 import { themeFromUserMetadata } from "@/lib/app-theme";
+import { layoutFromUserMetadata } from "@/lib/ledger-layout";
 import { ensureOrganizationForUser } from "@/lib/organization";
 import { getOrganizationContext } from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
@@ -26,14 +28,17 @@ export default async function DashboardLayout({
     data: { user },
   } = await supabase.auth.getUser();
   const initialThemeFromAccount = themeFromUserMetadata(user?.user_metadata);
+  const initialLayoutFromAccount = layoutFromUserMetadata(user?.user_metadata);
 
   return (
     <AppThemeProvider initialThemeFromAccount={initialThemeFromAccount}>
-      <ServerActionSyncGuard />
-      <AppShell orgName={orgDisplayName} organizationId={organizationId}>
-        <InstallPwaHint />
-        {children}
-      </AppShell>
+      <LedgerLayoutProvider initialLayoutFromAccount={initialLayoutFromAccount}>
+        <ServerActionSyncGuard />
+        <AppShell orgName={orgDisplayName} organizationId={organizationId}>
+          <InstallPwaHint />
+          {children}
+        </AppShell>
+      </LedgerLayoutProvider>
     </AppThemeProvider>
   );
 }

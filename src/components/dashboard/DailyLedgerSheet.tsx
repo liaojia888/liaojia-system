@@ -34,6 +34,7 @@ import {
   weChatShareSuccessMessage,
 } from "@/lib/whatsapp-export";
 import { DailyLedgerMobileRows } from "@/components/dashboard/DailyLedgerMobileRows";
+import { useLedgerLayout } from "@/components/providers/LedgerLayoutProvider";
 import { useLedgerMonthData } from "@/hooks/useLedgerMonthData";
 import { buildMonthCsv, downloadTextFile } from "@/lib/ledger-export";
 
@@ -68,6 +69,9 @@ export function DailyLedgerSheet({
 }: {
   organizationId: string | null;
 }) {
+  const { layout: ledgerLayout } = useLedgerLayout();
+  const isWorkbench = ledgerLayout === "workbench";
+
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -338,18 +342,45 @@ export function DailyLedgerSheet({
 
   return (
     <div className="ledger-workspace flex min-h-0 flex-1 flex-col">
-      <header className="ledger-hero rounded-b-2xl px-4 py-5 sm:px-6 lg:px-8 lg:py-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <header
+        className={
+          isWorkbench
+            ? "ledger-hero rounded-b-2xl px-3 py-3 sm:px-5 sm:py-4"
+            : "ledger-hero rounded-b-2xl px-4 py-5 sm:px-6 lg:px-8 lg:py-6"
+        }
+      >
+        <div
+          className={
+            isWorkbench
+              ? "flex flex-wrap items-center justify-between gap-3"
+              : "flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+          }
+        >
           <div className="min-w-0 flex-1">
-            <p className="ledger-hero-kicker text-[10px] font-bold uppercase tracking-[0.25em] sm:text-xs">
-              Daily Ledger
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+            {!isWorkbench ? (
+              <p className="ledger-hero-kicker text-[10px] font-bold uppercase tracking-[0.25em] sm:text-xs">
+                Daily Ledger
+              </p>
+            ) : null}
+            <h1
+              className={
+                isWorkbench
+                  ? "text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl"
+                  : "mt-1 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl"
+              }
+            >
               {year} 年 {month} 月
+              {isWorkbench ? (
+                <span className="ml-2 text-sm font-medium text-slate-600">
+                  工作台
+                </span>
+              ) : null}
             </h1>
-            <p className="mt-0.5 text-sm font-medium text-slate-600">
-              營收對帳表
-            </p>
+            {!isWorkbench ? (
+              <p className="mt-0.5 text-sm font-medium text-slate-600">
+                營收對帳表
+              </p>
+            ) : null}
           </div>
 
           <div
@@ -390,24 +421,46 @@ export function DailyLedgerSheet({
           </div>
         )}
 
-        <p className="mt-2 max-w-3xl text-xs leading-relaxed text-slate-500">
-          <span className="hidden lg:inline">
-            右鍵可管理列與備註；轉數快／支出每筆可「＋備註」。
-          </span>
-          <span className="lg:hidden">每列「列操作」或「＋備註」。</span>
-          {organizationId ? (
-            <span className="mt-1 block text-slate-600">
-              編輯即存本機；備份資料庫請按「儲存至 Supabase」。尾數自動計算。
+        {!isWorkbench ? (
+          <p className="mt-2 max-w-3xl text-xs leading-relaxed text-slate-500">
+            <span className="hidden lg:inline">
+              右鍵可管理列與備註；轉數快／支出每筆可「＋備註」。
             </span>
-          ) : (
-            <span className="mt-1 block text-slate-600">
-              編輯即存本機；請至設定建立公司後可存 Supabase。
-            </span>
-          )}
-        </p>
+            <span className="lg:hidden">每列「列操作」或「＋備註」。</span>
+            {organizationId ? (
+              <span className="mt-1 block text-slate-600">
+                編輯即存本機；備份資料庫請按「儲存至 Supabase」。尾數自動計算。
+              </span>
+            ) : (
+              <span className="mt-1 block text-slate-600">
+                編輯即存本機；請至設定建立公司後可存 Supabase。
+              </span>
+            )}
+          </p>
+        ) : (
+          <p className="mt-2 text-xs text-slate-600">
+            每日卡片編輯；一改即存本機。可在{" "}
+            <Link href="/settings" className="font-medium text-emerald-800 underline">
+              系統設定
+            </Link>{" "}
+            改回試算表視圖。
+          </p>
+        )}
 
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-stretch">
-          <div className="col-span-2 hidden min-w-[11rem] sm:block">
+        <div
+          className={
+            isWorkbench
+              ? "mt-3 flex flex-wrap items-stretch gap-2"
+              : "mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-stretch"
+          }
+        >
+          <div
+            className={
+              isWorkbench
+                ? "min-w-[11rem] flex-1 sm:flex-none sm:min-w-[12rem]"
+                : "col-span-2 hidden min-w-[11rem] sm:block"
+            }
+          >
             {saveSupabaseControl}
           </div>
           <button
@@ -462,7 +515,13 @@ export function DailyLedgerSheet({
           </div>
         ) : null}
 
-        <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div
+          className={
+            isWorkbench
+              ? "mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4"
+              : "mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4"
+          }
+        >
           <SummaryChip label="淨收入（扣撤單）" value={totals.totalRevenue} highlight />
           <SummaryChip label="總支出" value={totals.expenses} />
           <SummaryChip label="待入銀行合計" value={totals.bankPending} />
@@ -470,8 +529,14 @@ export function DailyLedgerSheet({
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-auto p-3 pb-28 sm:p-4 sm:pb-6 lg:p-6">
-        <div className="lg:hidden">
+      <div
+        className={
+          isWorkbench
+            ? "min-h-0 flex-1 overflow-auto p-3 pb-24 sm:p-4 sm:pb-24"
+            : "min-h-0 flex-1 overflow-auto p-3 pb-28 sm:p-4 sm:pb-6 lg:p-6"
+        }
+      >
+        <div className={isWorkbench ? "block" : "lg:hidden"}>
           <DailyLedgerMobileRows
             rows={computed}
             totals={totals}
@@ -489,7 +554,7 @@ export function DailyLedgerSheet({
           />
         </div>
 
-        <div className="hidden lg:block">
+        <div className={isWorkbench ? "hidden" : "hidden lg:block"}>
           <p className="mb-2 text-center text-xs text-slate-500 xl:hidden">
             ← 左右滑動可查看更多欄位 →
           </p>
@@ -709,7 +774,13 @@ export function DailyLedgerSheet({
         </div>
       </div>
 
-      <div className="sticky bottom-0 z-30 shrink-0 border-t border-emerald-200/80 bg-white/95 px-3 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur-sm sm:hidden">
+      <div
+        className={
+          isWorkbench
+            ? "sticky bottom-0 z-30 shrink-0 border-t border-emerald-200/80 bg-white/95 px-3 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur-sm lg:hidden"
+            : "sticky bottom-0 z-30 shrink-0 border-t border-emerald-200/80 bg-white/95 px-3 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur-sm sm:hidden"
+        }
+      >
         <p className="mb-2 text-center text-[11px] leading-snug text-slate-600">
           欄位一改即存本機；備份到 Supabase 資料庫請按：
         </p>

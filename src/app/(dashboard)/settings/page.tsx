@@ -1,4 +1,5 @@
 import { AppearanceSettings } from "@/components/settings/AppearanceSettings";
+import { LedgerLayoutSettings } from "@/components/settings/LedgerLayoutSettings";
 import { AuthAccountPanel } from "@/components/settings/AuthAccountPanel";
 import { EnsureOrganizationPanel } from "@/components/settings/EnsureOrganizationPanel";
 import { LedgerAuditLogPanel } from "@/components/settings/LedgerAuditLogPanel";
@@ -39,6 +40,7 @@ export default async function SettingsPage() {
       />
       <LedgerAuditLogPanel />
       <AppearanceSettings />
+      <LedgerLayoutSettings />
       <LedgerBackupSettings />
     </div>
   );
