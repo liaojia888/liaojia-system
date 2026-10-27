@@ -24,6 +24,7 @@ import {
   saveLocalMonth,
 } from "@/lib/ledger-local-store";
 import {
+  applyRemoteMonthToLocalTemplate,
   mergeLocalMonthWithRemote,
   monthHasUserData,
 } from "@/lib/ledger-row-merge";
@@ -132,14 +133,33 @@ export function useLedgerMonthData({
     (
       local: DailyLedgerRow[],
       remote: LedgerMonthPayload | null,
+      options?: { forceRemote?: boolean },
     ): DailyLedgerRow[] => {
       if (!remote?.rows?.length) {
         remoteUpdatedAtRef.current = null;
         return local;
       }
       const remoteRows = sortRowsByDate(remote.rows);
-      const merged = mergeLocalMonthWithRemote(local, remoteRows);
       remoteUpdatedAtRef.current = remote.updatedAt;
+
+      const localSavedAt = loadLocalClientSavedAt(monthKey);
+      const remoteIsNewer =
+        !localSavedAt ||
+        new Date(remote.updatedAt) > new Date(localSavedAt);
+
+      const useRemoteAsBase =
+        options?.forceRemote ||
+        (remoteIsNewer && !cloudDirtyRef.current);
+
+      const merged = useRemoteAsBase
+        ? applyRemoteMonthToLocalTemplate(local, remoteRows)
+        : mergeLocalMonthWithRemote(local, remoteRows);
+
+      if (useRemoteAsBase) {
+        markCloudClean();
+        setSyncStatus("synced");
+        return merged;
+      }
 
       const hadLocal = monthHasUserData(local);
       const differs = mergedDiffersFromRemote(
@@ -158,7 +178,7 @@ export function useLedgerMonthData({
 
       return merged;
     },
-    [year, month],
+    [monthKey, year, month],
   );
 
   const syncMonthFromSupabase = useCallback(async (): Promise<
@@ -229,6 +249,62 @@ export function useLedgerMonthData({
   const reloadMonth = useCallback(() => {
     void syncMonthFromSupabase();
   }, [syncMonthFromSupabase]);
+
+  /** 以 Supabase 為準覆蓋本月（本機未存變更時） */
+  const pullCloudMonth = useCallback(async (): Promise<
+    { ok: true } | { ok: false; error: string }
+  > => {
+    if (!organizationId) {
+      return { ok: false, error: "尚未建立公司。" };
+    }
+    if (cloudDirtyRef.current) {
+      return {
+        ok: false,
+        error: "本機有尚未存至 Supabase 的修改，請先儲存或還原後再拉取。",
+      };
+    }
+
+    const generation = ++fetchGenerationRef.current;
+    setSyncStatus("syncing");
+    setSyncMessage(null);
+
+    const local = rowsForMonthKey(monthKey, year, month);
+    const result = await fetchLedgerMonth(monthKey);
+
+    if (generation !== fetchGenerationRef.current) {
+      return { ok: true };
+    }
+
+    if (!result.ok) {
+      setSyncStatus("error");
+      setSyncMessage(result.error);
+      return { ok: false, error: result.error };
+    }
+
+    if (!result.data?.rows?.length) {
+      setSyncMessage("Supabase 尚無本月資料。");
+      setSyncStatus("local_saved");
+      return { ok: true };
+    }
+
+    const merged = applyRemotePayload(local, result.data, {
+      forceRemote: true,
+    });
+    const sorted = writeLocalRows(merged);
+    rowsRef.current = sorted;
+    setRowsState(sorted);
+    skipCloudDirtyOnceRef.current = true;
+    setSyncStatus("synced");
+    setSyncMessage("已以 Supabase 覆蓋本月本機資料。");
+    return { ok: true };
+  }, [
+    applyRemotePayload,
+    monthKey,
+    month,
+    organizationId,
+    writeLocalRows,
+    year,
+  ]);
 
   /** 切換月份或登入後：讀本機並從 Supabase 合併 */
   useEffect(() => {
@@ -418,6 +494,7 @@ export function useLedgerMonthData({
     cloudDirty,
     isSavingCloud,
     reloadMonth,
+    pullCloudMonth,
     syncMonthFromSupabase,
     applyCloudVersion,
     dismissCloudConflict,

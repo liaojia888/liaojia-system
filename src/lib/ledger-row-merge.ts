@@ -55,3 +55,18 @@ export function mergeLocalMonthWithRemote(
 ): DailyLedgerRow[] {
   return mergeMonthRowsPreferRicher(local, remote);
 }
+
+/** Supabase 較新時：以雲端列覆蓋對應日期（保留本機列 id），避免刪除後被舊本機「較完整」資料蓋回 */
+export function applyRemoteMonthToLocalTemplate(
+  local: DailyLedgerRow[],
+  remote: DailyLedgerRow[],
+): DailyLedgerRow[] {
+  const remoteByDate = new Map(remote.map((r) => [r.date, r]));
+  return sortRowsByDate(
+    local.map((row) => {
+      const rem = remoteByDate.get(row.date);
+      if (!rem) return row;
+      return { ...rem, id: row.id };
+    }),
+  );
+}

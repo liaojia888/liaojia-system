@@ -93,6 +93,7 @@ export function DailyLedgerSheet({
     applyCloudVersion,
     dismissCloudConflict,
     reloadMonth,
+    pullCloudMonth,
     persistBeforeShare,
     saveToCloud,
     cloudDirty,
@@ -484,6 +485,15 @@ export function DailyLedgerSheet({
           >
             {showAllNotes ? "隱藏備註" : "顯示備註"}
           </button>
+          {organizationId ? (
+            <button
+              type="button"
+              onClick={() => void pullCloudMonth()}
+              className="ledger-touch-btn ledger-btn-ghost h-11 rounded-xl px-4 text-sm font-medium shadow-sm"
+            >
+              從 Supabase 更新
+            </button>
+          ) : null}
         </div>
 
         {cloudConflict ? (

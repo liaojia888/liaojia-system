@@ -19,7 +19,10 @@ import {
   loadAllLocalMonths,
   replaceAllLocalMonths,
 } from "@/lib/ledger-local-store";
-import { mergeLocalMonthWithRemote } from "@/lib/ledger-row-merge";
+import {
+  applyRemoteMonthToLocalTemplate,
+  mergeLocalMonthWithRemote,
+} from "@/lib/ledger-row-merge";
 import {
   mergeParsedRowIntoMonth,
   monthKeyFromIsoDate,
@@ -193,10 +196,17 @@ export function LedgerBackupSettings() {
       const existing = loadAllLocalMonths();
       const mergedAll: Record<string, DailyLedgerRow[]> = { ...existing };
       for (const [monthKey, payload] of Object.entries(result.months)) {
-        const local = existing[monthKey];
-        mergedAll[monthKey] = local?.length
-          ? mergeLocalMonthWithRemote(local, payload.rows)
-          : sortRowsByDate(payload.rows);
+        const [y, m] = monthKey.split("-").map(Number);
+        const local =
+          existing[monthKey]?.length && y && m
+            ? existing[monthKey]
+            : y && m
+              ? defaultRowsForMonth(y, m)
+              : sortRowsByDate(payload.rows);
+        mergedAll[monthKey] = applyRemoteMonthToLocalTemplate(
+          local,
+          payload.rows,
+        );
       }
       replaceAllLocalMonths(mergedAll);
       setMessage(
