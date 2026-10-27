@@ -314,22 +314,21 @@ export function useLedgerMonthData({
     fetchGenerationRef.current += 1;
     const generation = fetchGenerationRef.current;
 
-    setReady(false);
     setCloudConflict(null);
     skipCloudDirtyOnceRef.current = true;
 
-    async function load() {
-      const local = rowsForMonthKey(monthKey, year, month);
+    const local = rowsForMonthKey(monthKey, year, month);
+    rowsRef.current = local;
+    setRowsState(local);
+    setReady(true);
 
+    async function syncFromCloud() {
       if (!organizationId) {
         if (cancelled || generation !== fetchGenerationRef.current) return;
-        rowsRef.current = local;
-        setRowsState(local);
         remoteUpdatedAtRef.current = null;
         markCloudClean();
         setSyncStatus("local_only");
         setSyncMessage(null);
-        setReady(true);
         return;
       }
 
@@ -339,11 +338,8 @@ export function useLedgerMonthData({
       if (cancelled || generation !== fetchGenerationRef.current) return;
 
       if (!result.ok) {
-        rowsRef.current = local;
-        setRowsState(local);
         setSyncStatus("error");
         setSyncMessage(result.error);
-        setReady(true);
         return;
       }
 
@@ -352,10 +348,9 @@ export function useLedgerMonthData({
       rowsRef.current = sorted;
       setRowsState(sorted);
       setSyncMessage(null);
-      setReady(true);
     }
 
-    void load();
+    void syncFromCloud();
 
     return () => {
       cancelled = true;

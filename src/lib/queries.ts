@@ -1,11 +1,12 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveOrganizationId } from "@/lib/organization";
 import type { Organization } from "@/types/database";
 
-export async function getOrganizationContext(): Promise<{
+export const getOrganizationContext = cache(async (): Promise<{
   organization: Organization | null;
   organizationId: string | null;
-}> {
+}> => {
   const organizationId = await getActiveOrganizationId();
   if (!organizationId) {
     return { organization: null, organizationId: null };
@@ -19,4 +20,4 @@ export async function getOrganizationContext(): Promise<{
     .single();
 
   return { organization: data as Organization | null, organizationId };
-}
+});
