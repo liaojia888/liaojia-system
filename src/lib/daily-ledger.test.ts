@@ -53,7 +53,7 @@ describe("computeRows 尾數累計", () => {
     expect(r1.balance).toBe(850);
   });
 
-  it("轉數快與已入銀行、支出減少尾數；待入銀行不扣尾數", () => {
+  it("轉數快、已入銀行、待入銀行、支出皆減少尾數", () => {
     const [r1] = computeRows([
       row("2026-01-01", {
         fuel: 2000,
@@ -65,7 +65,7 @@ describe("computeRows 尾數累計", () => {
         expenseEntries: [{ id: "ex-1", label: "", amount: 100 }],
       }),
     ]);
-    expect(r1.balance).toBe(2000 - 400 - 300 - 100);
+    expect(r1.balance).toBe(2000 - 400 - 300 - 999 - 100);
     expect(r1.bankPending).toBe(999);
   });
 

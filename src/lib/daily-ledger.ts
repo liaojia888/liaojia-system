@@ -383,7 +383,10 @@ export function computeRows(rows: DailyLedgerRow[]): DailyLedgerComputed[] {
     const fps = aggregateFpsEntries(row.fpsEntries);
     const expenses = totalExpenseOutflow(row.expenseEntries);
     const outflow =
-      totalFpsOutflow(row.fpsEntries) + row.bankDeposited + expenses;
+      totalFpsOutflow(row.fpsEntries) +
+      row.bankDeposited +
+      row.bankPending +
+      expenses;
     const balance = previousBalance + totalRevenue - outflow;
     previousBalance = balance;
     return {

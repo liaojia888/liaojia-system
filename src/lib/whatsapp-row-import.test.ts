@@ -41,6 +41,7 @@ describe("parseLedgerRowFromWhatsApp", () => {
     expect(row!.expenseEntries[0].amount).toBe(95);
 
     const [computed] = computeRows([row!]);
-    expect(computed.balance).toBe(0);
+    // 695 淨收入 − 轉數快 400 − 已入 200 − 待入 100 − 支出 95
+    expect(computed.balance).toBe(-100);
   });
 });
