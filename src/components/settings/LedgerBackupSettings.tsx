@@ -11,6 +11,7 @@ import { downloadJsonBackup } from "@/lib/ledger-export";
 import {
   defaultRowsForMonth,
   normalizeRow,
+  sortRowsByDate,
   type DailyLedgerRow,
 } from "@/lib/daily-ledger";
 import {
@@ -18,6 +19,7 @@ import {
   loadAllLocalMonths,
   replaceAllLocalMonths,
 } from "@/lib/ledger-local-store";
+import { mergeLocalMonthWithRemote } from "@/lib/ledger-row-merge";
 import {
   mergeParsedRowIntoMonth,
   monthKeyFromIsoDate,
@@ -167,6 +169,42 @@ export function LedgerBackupSettings() {
     });
   }
 
+  function pullAllMonthsFromSupabase() {
+    startTransition(async () => {
+      setError(null);
+      setMessage(null);
+      const ensured = await ensureOrganizationAction(
+        readLocalCompanyName()?.trim() || "我的公司",
+      );
+      if (!ensured.organizationId) {
+        setError(ensured.error ?? "尚未建立公司。");
+        return;
+      }
+      const result = await fetchAllLedgerMonths();
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      const keys = Object.keys(result.months);
+      if (keys.length === 0) {
+        setError("Supabase 尚無任何月份日結。");
+        return;
+      }
+      const existing = loadAllLocalMonths();
+      const mergedAll: Record<string, DailyLedgerRow[]> = { ...existing };
+      for (const [monthKey, payload] of Object.entries(result.months)) {
+        const local = existing[monthKey];
+        mergedAll[monthKey] = local?.length
+          ? mergeLocalMonthWithRemote(local, payload.rows)
+          : sortRowsByDate(payload.rows);
+      }
+      replaceAllLocalMonths(mergedAll);
+      setMessage(
+        `已從 Supabase 合併 ${keys.length} 個月份至本機。請至日結表重新整理或切換月份查看。`,
+      );
+    });
+  }
+
   function clearLocalLedgerCache() {
     const count = Object.keys(loadAllLocalMonths()).length;
     if (count === 0) {
@@ -243,9 +281,18 @@ export function LedgerBackupSettings() {
     <section className="report-page-card rounded-2xl p-5 sm:p-6">
       <h2 className="report-block-title text-lg font-semibold">備份與還原</h2>
       <p className="mt-1 text-sm text-slate-600">
-        日結編輯會自動存本機（瀏覽器）；Supabase 資料庫需在日結表按「儲存至 Supabase」。若資料庫是空的，可用「將本機日結寫入 Supabase」一次匯入。
+        登入後日結表會自動從 Supabase 載入目前月份；編輯會存本機，改動後請按「儲存至
+        Supabase」讓手機／其他電腦看到最新資料。新裝置可先按「從 Supabase 載入全部月份」。
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={pullAllMonthsFromSupabase}
+          disabled={pending}
+          className="ledger-touch-btn ledger-btn-primary rounded-full px-4 py-2.5 text-sm font-medium"
+        >
+          從 Supabase 載入全部月份
+        </button>
         <button
           type="button"
           onClick={backupFromLocal}

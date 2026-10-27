@@ -43,3 +43,15 @@ export function mergeMonthRowsPreferRicher(
     }),
   );
 }
+
+export function monthHasUserData(rows: DailyLedgerRow[]): boolean {
+  return rows.some((r) => ledgerRowRichness(r) > 0);
+}
+
+/** 合併本機月列與 Supabase 月列（保留本機列 id） */
+export function mergeLocalMonthWithRemote(
+  local: DailyLedgerRow[],
+  remote: DailyLedgerRow[],
+): DailyLedgerRow[] {
+  return mergeMonthRowsPreferRicher(local, remote);
+}

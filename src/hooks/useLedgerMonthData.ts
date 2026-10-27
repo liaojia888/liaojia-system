@@ -9,6 +9,7 @@ import {
   type SetStateAction,
 } from "react";
 import {
+  fetchLedgerMonth,
   saveLedgerMonth,
   type LedgerMonthPayload,
 } from "@/app/actions/daily-ledger";
@@ -17,8 +18,15 @@ import {
   sortRowsByDate,
   type DailyLedgerRow,
 } from "@/lib/daily-ledger";
-import { loadLocalMonth, saveLocalMonth } from "@/lib/ledger-local-store";
-import { mergeMonthRowsPreferRicher } from "@/lib/ledger-row-merge";
+import {
+  loadLocalClientSavedAt,
+  loadLocalMonth,
+  saveLocalMonth,
+} from "@/lib/ledger-local-store";
+import {
+  mergeLocalMonthWithRemote,
+  monthHasUserData,
+} from "@/lib/ledger-row-merge";
 import { subscribeLedgerSync } from "@/lib/ledger-sync-events";
 
 export type LedgerSyncStatus =
@@ -36,6 +44,19 @@ function rowsForMonthKey(monthKey: string, year: number, month: number) {
   return local?.length
     ? sortRowsByDate(local)
     : defaultRowsForMonth(year, month);
+}
+
+function mergedDiffersFromRemote(
+  merged: DailyLedgerRow[],
+  remote: DailyLedgerRow[],
+  year: number,
+  month: number,
+): boolean {
+  const baseline = mergeLocalMonthWithRemote(
+    defaultRowsForMonth(year, month),
+    remote,
+  );
+  return JSON.stringify(merged) !== JSON.stringify(baseline);
 }
 
 export function useLedgerMonthData({
@@ -90,6 +111,7 @@ export function useLedgerMonthData({
   const [cloudDirty, setCloudDirty] = useState(false);
   const [isSavingCloud, setIsSavingCloud] = useState(false);
   const skipCloudDirtyOnceRef = useRef(true);
+  const fetchGenerationRef = useRef(0);
 
   function markCloudDirty() {
     if (!cloudDirtyRef.current) {
@@ -106,6 +128,90 @@ export function useLedgerMonthData({
     setCloudDirty(false);
   }
 
+  const applyRemotePayload = useCallback(
+    (
+      local: DailyLedgerRow[],
+      remote: LedgerMonthPayload | null,
+    ): DailyLedgerRow[] => {
+      if (!remote?.rows?.length) {
+        remoteUpdatedAtRef.current = null;
+        return local;
+      }
+      const remoteRows = sortRowsByDate(remote.rows);
+      const merged = mergeLocalMonthWithRemote(local, remoteRows);
+      remoteUpdatedAtRef.current = remote.updatedAt;
+
+      const hadLocal = monthHasUserData(local);
+      const differs = mergedDiffersFromRemote(
+        merged,
+        remoteRows,
+        year,
+        month,
+      );
+
+      if (hadLocal && differs) {
+        markCloudDirty();
+      } else {
+        markCloudClean();
+        setSyncStatus("synced");
+      }
+
+      return merged;
+    },
+    [year, month],
+  );
+
+  const syncMonthFromSupabase = useCallback(async (): Promise<
+    { ok: true } | { ok: false; error: string }
+  > => {
+    if (!organizationId) {
+      return { ok: false, error: "尚未建立公司。" };
+    }
+
+    const generation = ++fetchGenerationRef.current;
+    setSyncMessage(null);
+
+    const local = rowsForMonthKey(monthKey, year, month);
+    const result = await fetchLedgerMonth(monthKey);
+
+    if (generation !== fetchGenerationRef.current) {
+      return { ok: true };
+    }
+
+    if (!result.ok) {
+      rowsRef.current = local;
+      setRowsState(local);
+      setSyncStatus("error");
+      setSyncMessage(result.error);
+      return { ok: false, error: result.error };
+    }
+
+    const merged = applyRemotePayload(local, result.data);
+    const sorted = writeLocalRows(merged);
+    rowsRef.current = sorted;
+    setRowsState(sorted);
+    skipCloudDirtyOnceRef.current = true;
+
+    if (result.data?.rows?.length) {
+      setSyncStatus((s) =>
+        s === "cloud_pending" ? s : "synced",
+      );
+    } else if (monthHasUserData(sorted)) {
+      setSyncStatus("local_saved");
+    } else {
+      setSyncStatus("local_saved");
+    }
+
+    return { ok: true };
+  }, [
+    applyRemotePayload,
+    monthKey,
+    month,
+    organizationId,
+    writeLocalRows,
+    year,
+  ]);
+
   const reloadFromLocalCache = useCallback(() => {
     if (shareLockRef.current || cloudDirtyRef.current) return;
     const local = loadLocalMonth(monthKey);
@@ -116,33 +222,74 @@ export function useLedgerMonthData({
       return;
     }
     setRows((prev) =>
-      mergeMonthRowsPreferRicher(prev, sortRowsByDate(local)),
+      mergeLocalMonthWithRemote(prev, sortRowsByDate(local)),
     );
-  }, [monthKey, year, month]);
+  }, [monthKey, year, month, setRows]);
 
   const reloadMonth = useCallback(() => {
-    const local = loadLocalMonth(monthKey);
-    if (local?.length) {
-      setRows((prev) =>
-        mergeMonthRowsPreferRicher(prev, sortRowsByDate(local)),
-      );
-    }
-    setSyncMessage(null);
-  }, [monthKey]);
+    void syncMonthFromSupabase();
+  }, [syncMonthFromSupabase]);
 
-  /** 切換月份：只讀本機，不連 Supabase */
+  /** 切換月份或登入後：讀本機並從 Supabase 合併 */
   useEffect(() => {
-    const loaded = rowsForMonthKey(monthKey, year, month);
-    rowsRef.current = loaded;
-    setRowsState(loaded);
-    setReady(true);
-    remoteUpdatedAtRef.current = null;
-    skipCloudDirtyOnceRef.current = true;
-    markCloudClean();
+    let cancelled = false;
+    fetchGenerationRef.current += 1;
+    const generation = fetchGenerationRef.current;
+
+    setReady(false);
     setCloudConflict(null);
-    setSyncMessage(null);
-    setSyncStatus(organizationId ? "local_saved" : "local_only");
-  }, [monthKey, year, month, organizationId]);
+    skipCloudDirtyOnceRef.current = true;
+
+    async function load() {
+      const local = rowsForMonthKey(monthKey, year, month);
+
+      if (!organizationId) {
+        if (cancelled || generation !== fetchGenerationRef.current) return;
+        rowsRef.current = local;
+        setRowsState(local);
+        remoteUpdatedAtRef.current = null;
+        markCloudClean();
+        setSyncStatus("local_only");
+        setSyncMessage(null);
+        setReady(true);
+        return;
+      }
+
+      setSyncStatus("syncing");
+      const result = await fetchLedgerMonth(monthKey);
+
+      if (cancelled || generation !== fetchGenerationRef.current) return;
+
+      if (!result.ok) {
+        rowsRef.current = local;
+        setRowsState(local);
+        setSyncStatus("error");
+        setSyncMessage(result.error);
+        setReady(true);
+        return;
+      }
+
+      const merged = applyRemotePayload(local, result.data);
+      const sorted = writeLocalRows(merged);
+      rowsRef.current = sorted;
+      setRowsState(sorted);
+      setSyncMessage(null);
+      setReady(true);
+    }
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    applyRemotePayload,
+    monthKey,
+    month,
+    organizationId,
+    writeLocalRows,
+    year,
+  ]);
 
   useEffect(() => {
     if (!organizationId) {
@@ -158,6 +305,20 @@ export function useLedgerMonthData({
     });
   }, [monthKey, reloadFromLocalCache]);
 
+  /** 回到分頁時若本機無未存變更，再拉一次 Supabase（多裝置同步） */
+  useEffect(() => {
+    if (!organizationId) return;
+
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      if (cloudDirtyRef.current || shareLockRef.current) return;
+      void syncMonthFromSupabase();
+    };
+
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [organizationId, syncMonthFromSupabase]);
+
   /** 編輯後更新 Supabase 同步狀態（本機已在 setRows 當下寫入） */
   useEffect(() => {
     if (!ready || rows.length === 0) return;
@@ -169,7 +330,7 @@ export function useLedgerMonthData({
     if (skipCloudDirtyOnceRef.current) {
       skipCloudDirtyOnceRef.current = false;
       setSyncStatus((s) =>
-        s === "conflict" || s === "syncing" ? s : "local_saved",
+        s === "conflict" || s === "syncing" ? s : s === "synced" ? "synced" : "local_saved",
       );
       return;
     }
@@ -179,14 +340,14 @@ export function useLedgerMonthData({
   const applyCloudVersion = useCallback(() => {
     if (!cloudConflict) return;
     const remoteRows = sortRowsByDate(cloudConflict.rows);
-    const next = mergeMonthRowsPreferRicher(rowsRef.current, remoteRows);
+    const next = mergeLocalMonthWithRemote(rowsRef.current, remoteRows);
     remoteUpdatedAtRef.current = cloudConflict.updatedAt;
     setRows(next);
     setCloudConflict(null);
     markCloudClean();
     setSyncStatus("synced");
     setSyncMessage(null);
-  }, [cloudConflict, monthKey]);
+  }, [cloudConflict, setRows]);
 
   const dismissCloudConflict = useCallback(() => {
     setCloudConflict(null);
@@ -194,7 +355,7 @@ export function useLedgerMonthData({
     setSyncStatus(cloudDirtyRef.current ? "cloud_pending" : "local_saved");
   }, []);
 
-  /** 唯一寫入 Supabase 的入口（手動） */
+  /** 手動寫入 Supabase */
   const saveToCloud = useCallback(async (): Promise<
     { ok: true } | { ok: false; error: string }
   > => {
@@ -211,7 +372,11 @@ export function useLedgerMonthData({
     saveLocalMonth(monthKey, current);
 
     try {
-      const result = await saveLedgerMonth(monthKey, current, null);
+      const result = await saveLedgerMonth(
+        monthKey,
+        current,
+        remoteUpdatedAtRef.current,
+      );
 
       if (result.ok) {
         remoteUpdatedAtRef.current = result.updatedAt;
@@ -253,6 +418,7 @@ export function useLedgerMonthData({
     cloudDirty,
     isSavingCloud,
     reloadMonth,
+    syncMonthFromSupabase,
     applyCloudVersion,
     dismissCloudConflict,
     saveToCloud,

@@ -287,13 +287,15 @@ export function DailyLedgerSheet({
 
   const syncLabel =
     syncStatus === "syncing"
-        ? "寫入 Supabase…"
+        ? isSavingCloud
+          ? "寫入 Supabase…"
+          : "正在從 Supabase 同步…"
         : syncStatus === "synced"
-          ? "已寫入 Supabase"
+          ? "已與 Supabase 同步"
           : syncStatus === "cloud_pending"
-            ? "已存本機 · Supabase 尚未更新"
+            ? "已存本機 · 請按「儲存至 Supabase」更新資料庫"
             : syncStatus === "local_saved"
-              ? "已存本機（需手動存 Supabase）"
+              ? "已存本機 · 資料庫尚無本月備份"
               : syncStatus === "local_only"
                 ? "僅本機（未連公司）"
                 : syncStatus === "conflict"
@@ -428,9 +430,10 @@ export function DailyLedgerSheet({
             </span>
             <span className="lg:hidden">每列「列操作」或「＋備註」。</span>
             {organizationId ? (
-              <span className="mt-1 block text-slate-600">
-                編輯即存本機；備份資料庫請按「儲存至 Supabase」。尾數自動計算。
-              </span>
+            <span className="mt-1 block text-slate-600">
+              登入後會自動從 Supabase 載入並合併；編輯即存本機，改動後請按「儲存至
+              Supabase」讓其他裝置同步。尾數自動計算。
+            </span>
             ) : (
               <span className="mt-1 block text-slate-600">
                 編輯即存本機；請至設定建立公司後可存 Supabase。
