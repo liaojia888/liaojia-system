@@ -17,6 +17,7 @@ import {
 import {
   clearAllLocalLedgerMonths,
   loadAllLocalMonths,
+  markLocalRemoteAppliedAt,
   replaceAllLocalMonths,
 } from "@/lib/ledger-local-store";
 import {
@@ -209,6 +210,11 @@ export function LedgerBackupSettings() {
         );
       }
       replaceAllLocalMonths(mergedAll);
+      for (const [monthKey, payload] of Object.entries(result.months)) {
+        if (payload.updatedAt) {
+          markLocalRemoteAppliedAt(monthKey, payload.updatedAt);
+        }
+      }
       setMessage(
         `已從 Supabase 合併 ${keys.length} 個月份至本機。請至日結表重新整理或切換月份查看。`,
       );

@@ -19,8 +19,9 @@ import {
   type DailyLedgerRow,
 } from "@/lib/daily-ledger";
 import {
-  loadLocalClientSavedAt,
+  loadLocalLastRemoteAppliedAt,
   loadLocalMonth,
+  markLocalRemoteAppliedAt,
   saveLocalMonth,
 } from "@/lib/ledger-local-store";
 import {
@@ -142,20 +143,21 @@ export function useLedgerMonthData({
       const remoteRows = sortRowsByDate(remote.rows);
       remoteUpdatedAtRef.current = remote.updatedAt;
 
-      const localSavedAt = loadLocalClientSavedAt(monthKey);
-      const remoteIsNewer =
-        !localSavedAt ||
-        new Date(remote.updatedAt) > new Date(localSavedAt);
+      const lastApplied = loadLocalLastRemoteAppliedAt(monthKey);
+      const remoteAheadOfApplied =
+        !lastApplied ||
+        new Date(remote.updatedAt) > new Date(lastApplied);
 
       const useRemoteAsBase =
         options?.forceRemote ||
-        (remoteIsNewer && !cloudDirtyRef.current);
+        (!cloudDirtyRef.current && remoteAheadOfApplied);
 
       const merged = useRemoteAsBase
         ? applyRemoteMonthToLocalTemplate(local, remoteRows)
         : mergeLocalMonthWithRemote(local, remoteRows);
 
       if (useRemoteAsBase) {
+        markLocalRemoteAppliedAt(monthKey, remote.updatedAt);
         markCloudClean();
         setSyncStatus("synced");
         return merged;
@@ -381,18 +383,31 @@ export function useLedgerMonthData({
     });
   }, [monthKey, reloadFromLocalCache]);
 
-  /** 回到分頁時若本機無未存變更，再拉一次 Supabase（多裝置同步） */
+  /** 前景時定期／切回分頁時拉 Supabase（多裝置；非即時推送） */
   useEffect(() => {
     if (!organizationId) return;
 
-    const onVisible = () => {
+    const BACKGROUND_SYNC_MS = 30_000;
+
+    const pullIfIdle = () => {
       if (document.visibilityState !== "visible") return;
       if (cloudDirtyRef.current || shareLockRef.current) return;
       void syncMonthFromSupabase();
     };
 
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
+    document.addEventListener("visibilitychange", pullIfIdle);
+    window.addEventListener("focus", pullIfIdle);
+    window.addEventListener("pageshow", pullIfIdle);
+    window.addEventListener("online", pullIfIdle);
+    const intervalId = window.setInterval(pullIfIdle, BACKGROUND_SYNC_MS);
+
+    return () => {
+      document.removeEventListener("visibilitychange", pullIfIdle);
+      window.removeEventListener("focus", pullIfIdle);
+      window.removeEventListener("pageshow", pullIfIdle);
+      window.removeEventListener("online", pullIfIdle);
+      window.clearInterval(intervalId);
+    };
   }, [organizationId, syncMonthFromSupabase]);
 
   /** 編輯後更新 Supabase 同步狀態（本機已在 setRows 當下寫入） */
@@ -456,6 +471,7 @@ export function useLedgerMonthData({
 
       if (result.ok) {
         remoteUpdatedAtRef.current = result.updatedAt;
+        markLocalRemoteAppliedAt(monthKey, result.updatedAt);
         markCloudClean();
         setCloudConflict(null);
         setSyncStatus("synced");

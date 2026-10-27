@@ -432,8 +432,8 @@ export function DailyLedgerSheet({
             <span className="lg:hidden">每列「列操作」或「＋備註」。</span>
             {organizationId ? (
             <span className="mt-1 block text-slate-600">
-              登入後會自動從 Supabase 載入並合併；編輯即存本機，改動後請按「儲存至
-              Supabase」讓其他裝置同步。尾數自動計算。
+              登入後會從 Supabase 載入；編輯即存本機，改動後請按「儲存至 Supabase」。
+              其他裝置在日結頁開著時約每 30 秒自動更新，或按「從 Supabase 更新」立即對齊。
             </span>
             ) : (
               <span className="mt-1 block text-slate-600">

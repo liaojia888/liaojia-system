@@ -10,6 +10,8 @@ type StoredLedger = {
   rows: DailyLedgerRow[];
   /** 本機最後寫入時間（ISO），用於避免被較舊的雲端覆蓋 */
   clientSavedAt?: string;
+  /** 上次成功對齊的 Supabase updated_at（ISO）；勿與 clientSavedAt 混用 */
+  lastRemoteAppliedAt?: string;
 };
 
 function canUseLocalStorage(): boolean {
@@ -54,6 +56,36 @@ export function loadLocalClientSavedAt(monthKey: string): string | null {
     return all[monthKey]?.clientSavedAt ?? null;
   } catch {
     return null;
+  }
+}
+
+export function loadLocalLastRemoteAppliedAt(monthKey: string): string | null {
+  if (!canUseLocalStorage()) return null;
+  try {
+    const raw = localStorage.getItem(LEDGER_STORAGE_KEY);
+    if (!raw) return null;
+    const all = JSON.parse(raw) as Record<string, StoredLedger>;
+    return all[monthKey]?.lastRemoteAppliedAt ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function markLocalRemoteAppliedAt(
+  monthKey: string,
+  remoteUpdatedAt: string,
+) {
+  if (!canUseLocalStorage()) return;
+  try {
+    const raw = localStorage.getItem(LEDGER_STORAGE_KEY);
+    if (!raw) return;
+    const all = JSON.parse(raw) as Record<string, StoredLedger>;
+    const entry = all[monthKey];
+    if (!entry) return;
+    entry.lastRemoteAppliedAt = remoteUpdatedAt;
+    localStorage.setItem(LEDGER_STORAGE_KEY, JSON.stringify(all));
+  } catch {
+    // ignore
   }
 }
 
