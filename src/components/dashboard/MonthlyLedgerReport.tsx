@@ -24,6 +24,8 @@ import { readLocalCompanyName } from "@/lib/company-display-name";
 import {
   formatLedgerMonthForWhatsApp,
   openWhatsAppShare,
+  shareViaWeChat,
+  weChatShareSuccessMessage,
 } from "@/lib/whatsapp-export";
 
 function monthKey(year: number, month: number) {
@@ -62,7 +64,7 @@ export function MonthlyLedgerReport({
 
   const key = monthKey(year, month);
 
-  const { rows, ready, syncStatus } = useLedgerMonthData({
+  const { rows, ready, syncStatus, persistBeforeShare } = useLedgerMonthData({
     monthKey: key,
     year,
     month,
@@ -151,28 +153,63 @@ export function MonthlyLedgerReport({
   }
 
   function shareWhatsAppMonth() {
-    const sorted = sortRowsByDate(filteredRows);
-    const computed = computeRows(sorted);
-    const { totals: t } = summarizeRows(filteredRows);
-    const result = openWhatsAppShare(
-      formatLedgerMonthForWhatsApp(
-        computed,
-        t,
-        year,
-        month,
-        readLocalCompanyName() ?? "公司",
-      ),
-    );
-    if (!result.ok && result.error) {
-      window.alert(result.error);
-    }
+    void (async () => {
+      const saved = await persistBeforeShare();
+      if (!saved.ok) {
+        window.alert(saved.error);
+        return;
+      }
+      const sorted = sortRowsByDate(filteredRows);
+      const computed = computeRows(sorted);
+      const { totals: t } = summarizeRows(filteredRows);
+      const result = openWhatsAppShare(
+        formatLedgerMonthForWhatsApp(
+          computed,
+          t,
+          year,
+          month,
+          readLocalCompanyName() ?? "公司",
+        ),
+      );
+      if (!result.ok && result.error) {
+        window.alert(result.error);
+      }
+    })();
+  }
+
+  function shareWeChatMonth() {
+    void (async () => {
+      const saved = await persistBeforeShare();
+      if (!saved.ok) {
+        window.alert(saved.error);
+        return;
+      }
+      const sorted = sortRowsByDate(filteredRows);
+      const computed = computeRows(sorted);
+      const { totals: t } = summarizeRows(filteredRows);
+      const result = await shareViaWeChat(
+        formatLedgerMonthForWhatsApp(
+          computed,
+          t,
+          year,
+          month,
+          readLocalCompanyName() ?? "公司",
+        ),
+      );
+      if (!result.ok && result.error) {
+        window.alert(result.error);
+      } else {
+        const msg = weChatShareSuccessMessage(result.mode);
+        if (msg) window.alert(msg);
+      }
+    })();
   }
 
   const syncHint =
     syncStatus === "loading"
-      ? "載入雲端資料…"
+      ? "載入 Supabase 資料…"
       : view === "year" && yearLoadingCloud
-        ? "載入年度雲端資料…"
+        ? "載入年度 Supabase 資料…"
         : null;
 
   return (
@@ -321,6 +358,7 @@ export function MonthlyLedgerReport({
             onPrint={() => window.print()}
             onExportCsv={exportMonthCsv}
             onWhatsApp={shareWhatsAppMonth}
+            onWeChat={shareWeChatMonth}
           />
         ) : (
           <YearReportBody
@@ -357,6 +395,7 @@ function MonthReportBody({
   onPrint,
   onExportCsv,
   onWhatsApp,
+  onWeChat,
 }: {
   ready: boolean;
   hasAnyData: boolean;
@@ -377,6 +416,7 @@ function MonthReportBody({
   onPrint: () => void;
   onExportCsv: () => void;
   onWhatsApp: () => void;
+  onWeChat: () => void;
 }) {
   if (!ready) {
     return (
@@ -446,6 +486,7 @@ function MonthReportBody({
         <div className="flex flex-wrap gap-2">
           <ActionBtn onClick={onExportCsv}>匯出 CSV</ActionBtn>
           <ActionBtn onClick={onWhatsApp}>WhatsApp</ActionBtn>
+          <ActionBtn onClick={onWeChat}>微信</ActionBtn>
           <ActionBtn onClick={onPrint}>列印</ActionBtn>
         </div>
       </div>

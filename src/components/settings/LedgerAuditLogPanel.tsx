@@ -17,18 +17,59 @@ function formatWhen(iso: string) {
 }
 
 function actionLabel(action: LedgerChangeLogEntry["action"]) {
-  return action === "import" ? "備份匯入" : "雲端儲存";
+  return action === "import" ? "備份匯入" : "Supabase 儲存";
+}
+
+/** 本機時區「今天」00:00～23:59:59.999，供 Supabase 篩選 */
+function localTodayBounds() {
+  const now = new Date();
+  const start = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    0,
+    0,
+    0,
+    0,
+  );
+  const end = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    23,
+    59,
+    59,
+    999,
+  );
+  const dayLabel = start.toLocaleDateString("zh-TW", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+  });
+  return {
+    createdAfter: start.toISOString(),
+    createdBefore: end.toISOString(),
+    dayLabel,
+  };
 }
 
 export function LedgerAuditLogPanel() {
   const [entries, setEntries] = useState<LedgerChangeLogEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dayLabel, setDayLabel] = useState(() => localTodayBounds().dayLabel);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const result = await fetchLedgerChangeLogs(50);
+    const bounds = localTodayBounds();
+    setDayLabel(bounds.dayLabel);
+    const result = await fetchLedgerChangeLogs({
+      limit: 100,
+      createdAfter: bounds.createdAfter,
+      createdBefore: bounds.createdBefore,
+    });
     if (result.ok) {
       setEntries(result.entries);
     } else {
@@ -48,7 +89,8 @@ export function LedgerAuditLogPanel() {
         <div>
           <h2 className="text-lg font-semibold text-slate-900">日結審計紀錄</h2>
           <p className="mt-1 text-sm text-slate-600">
-            記錄誰在何時更新哪個月的雲端日結。自動儲存同一使用者、同一月份約 15
+            僅顯示<strong className="font-medium text-slate-800">{dayLabel}</strong>
+            （本機時區）寫入 Supabase 的紀錄。同一使用者、同一月份約 15
             分鐘內只記一筆，避免洗版。
           </p>
         </div>
@@ -72,7 +114,7 @@ export function LedgerAuditLogPanel() {
 
       {!error && !loading && entries.length === 0 ? (
         <p className="mt-4 text-sm text-slate-600">
-          尚無紀錄。成功同步或匯入雲端日結後會出現在此。
+          今日尚無紀錄。成功寫入 Supabase 或匯入備份後會出現在此。
         </p>
       ) : null}
 

@@ -6,12 +6,18 @@ import type { LedgerNoteKey } from "@/lib/daily-ledger";
 export type NoteTarget = {
   rowId: string;
   noteKey: LedgerNoteKey;
+  /** 轉數快多筆時指定該筆 entry */
+  fpsEntryId?: string;
+  /** 支出多筆時指定該筆 entry */
+  expenseEntryId?: string;
 };
 
 export type ContextMenuState = {
   rowId: string;
   /** 金額格右鍵時帶入；日期格右鍵僅清空這行則可省略 */
   noteKey?: LedgerNoteKey;
+  fpsEntryId?: string;
+  expenseEntryId?: string;
   x: number;
   y: number;
 };
@@ -26,6 +32,8 @@ export function LedgerNoteContextMenu({
   onClearRow,
   onWhatsAppRow,
   onWhatsAppMonth,
+  onWeChatRow,
+  onWeChatMonth,
   onClose,
 }: {
   menu: ContextMenuState | null;
@@ -37,6 +45,8 @@ export function LedgerNoteContextMenu({
   onClearRow: () => void;
   onWhatsAppRow: () => void;
   onWhatsAppMonth: () => void;
+  onWeChatRow: () => void;
+  onWeChatMonth: () => void;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -181,6 +191,28 @@ export function LedgerNoteContextMenu({
         }}
       >
         WhatsApp 匯出本月
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        className={`${itemClass} text-emerald-800 hover:bg-emerald-50`}
+        onClick={() => {
+          onWeChatRow();
+          onClose();
+        }}
+      >
+        微信匯出此列
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        className={`${itemClass} text-emerald-800 hover:bg-emerald-50`}
+        onClick={() => {
+          onWeChatMonth();
+          onClose();
+        }}
+      >
+        微信匯出本月
       </button>
     </>
   );

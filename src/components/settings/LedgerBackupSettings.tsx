@@ -8,15 +8,25 @@ import {
 import { ensureOrganizationAction } from "@/app/actions/organization";
 import { readLocalCompanyName } from "@/lib/company-display-name";
 import { downloadJsonBackup } from "@/lib/ledger-export";
-import { normalizeRow, type DailyLedgerRow } from "@/lib/daily-ledger";
+import {
+  defaultRowsForMonth,
+  normalizeRow,
+  type DailyLedgerRow,
+} from "@/lib/daily-ledger";
 import {
   loadAllLocalMonths,
   replaceAllLocalMonths,
 } from "@/lib/ledger-local-store";
+import {
+  mergeParsedRowIntoMonth,
+  monthKeyFromIsoDate,
+  parseLedgerRowFromWhatsApp,
+} from "@/lib/whatsapp-row-import";
 
 export function LedgerBackupSettings() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [whatsappPaste, setWhatsappPaste] = useState("");
   const [pending, startTransition] = useTransition();
 
   function backupFromLocal() {
@@ -43,7 +53,7 @@ export function LedgerBackupSettings() {
         readLocalCompanyName()?.trim() || "我的公司",
       );
       if (!ensured.organizationId) {
-        setError(ensured.error ?? "尚未建立公司，請先點上方「建立公司並啟用雲端」。");
+        setError(ensured.error ?? "尚未建立公司，請先點上方「建立公司（Supabase）」。");
         return;
       }
       const result = await fetchAllLedgerMonths();
@@ -61,11 +71,11 @@ export function LedgerBackupSettings() {
         const localCount = Object.keys(local).length;
         if (localCount > 0) {
           setError(
-            `雲端尚無日結資料（本機有 ${localCount} 個月）。請按「將本機日結上傳至雲端」，或至日結表開啟各月份以自動同步。`,
+            `Supabase 尚無日結資料（本機有 ${localCount} 個月）。請按「將本機日結寫入 Supabase」，或至日結表按「儲存至 Supabase」。`,
           );
         } else {
           setError(
-            "雲端與本機都還沒有日結資料。請先到「日結表」輸入並存檔，再回來備份。",
+            "Supabase 與本機都還沒有日結資料。請先到「日結表」輸入並存本機，再回來備份。",
           );
         }
         return;
@@ -79,7 +89,7 @@ export function LedgerBackupSettings() {
         },
         `ledger-backup-cloud-${new Date().toISOString().slice(0, 10)}.json`,
       );
-      setMessage(`已下載雲端 ${count} 個月份的備份。`);
+      setMessage(`已下載 Supabase ${count} 個月份的備份。`);
     });
   }
 
@@ -106,8 +116,53 @@ export function LedgerBackupSettings() {
         return;
       }
       setMessage(
-        `已將本機 ${count} 個月份上傳至雲端（成功 ${result.imported} 個月）。現在可再按「下載雲端備份 JSON」。`,
+        `已將本機 ${count} 個月份寫入 Supabase（成功 ${result.imported} 個月）。現在可再按「下載 Supabase 備份 JSON」。`,
       );
+    });
+  }
+
+  function restoreFromWhatsAppPaste() {
+    startTransition(async () => {
+      setError(null);
+      setMessage(null);
+      const parsed = parseLedgerRowFromWhatsApp(whatsappPaste);
+      if (!parsed) {
+        setError(
+          "無法辨識內容。請貼上 WhatsApp「匯出此列」的完整文字（含【日結單列】與日期）。",
+        );
+        return;
+      }
+
+      const monthKey = monthKeyFromIsoDate(parsed.date);
+      const [yearStr, monthStr] = monthKey.split("-");
+      const year = Number(yearStr);
+      const month = Number(monthStr);
+      if (!year || !month) {
+        setError("日期格式不正確。");
+        return;
+      }
+
+      const all = loadAllLocalMonths();
+      const existing = all[monthKey];
+      const baseRows =
+        (existing?.length ?? 0) > 0
+          ? existing!
+          : defaultRowsForMonth(year, month);
+      const merged = mergeParsedRowIntoMonth(baseRows, parsed);
+      replaceAllLocalMonths({ ...all, [monthKey]: merged });
+
+      const cloud = await importLedgerBackup({ [monthKey]: merged });
+      if (!cloud.ok) {
+        setMessage(
+          `已寫入本機 ${parsed.date} 這一列；寫入 Supabase 失敗：${cloud.error}。請重新整理日結表。`,
+        );
+        return;
+      }
+
+      setMessage(
+        `已還原 ${parsed.date} 的日結列（本機 + Supabase）。請重新整理日結表確認。`,
+      );
+      setWhatsappPaste("");
     });
   }
 
@@ -147,12 +202,12 @@ export function LedgerBackupSettings() {
         replaceAllLocalMonths(months);
         const cloud = await importLedgerBackup(months);
         if (!cloud.ok) {
-          setMessage(`已寫入本機 ${count} 個月；雲端匯入失敗：${cloud.error}`);
+          setMessage(`已寫入本機 ${count} 個月；Supabase 匯入失敗：${cloud.error}`);
           return;
         }
 
         setMessage(
-          `已匯入 ${count} 個月（本機 + 雲端 ${cloud.imported} 個月）。請重新整理日結表。`,
+          `已匯入 ${count} 個月（本機 + Supabase ${cloud.imported} 個月）。請重新整理日結表。`,
         );
       } catch {
         setError("無法解析 JSON 備份檔。");
@@ -164,7 +219,7 @@ export function LedgerBackupSettings() {
     <section className="report-page-card rounded-2xl p-5 sm:p-6">
       <h2 className="report-block-title text-lg font-semibold">備份與還原</h2>
       <p className="mt-1 text-sm text-slate-600">
-        日結預設先存本機，編輯後會自動同步雲端。若雲端是空的，可用「上傳本機」一次匯入。
+        日結編輯會自動存本機（瀏覽器）；Supabase 資料庫需在日結表按「儲存至 Supabase」。若資料庫是空的，可用「將本機日結寫入 Supabase」一次匯入。
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
         <button
@@ -181,7 +236,7 @@ export function LedgerBackupSettings() {
           disabled={pending}
           className="ledger-touch-btn ledger-btn-primary rounded-full px-4 py-2.5 text-sm font-medium"
         >
-          將本機日結上傳至雲端
+          將本機日結寫入 Supabase
         </button>
         <button
           type="button"
@@ -189,7 +244,7 @@ export function LedgerBackupSettings() {
           disabled={pending}
           className="ledger-touch-btn ledger-btn-ghost rounded-full px-4 py-2.5 text-sm font-medium"
         >
-          下載雲端備份 JSON
+          下載 Supabase 備份 JSON
         </button>
         <label className="ledger-touch-btn cursor-pointer rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium hover:bg-slate-50">
           從 JSON 還原
@@ -200,6 +255,29 @@ export function LedgerBackupSettings() {
             onChange={onImportFile}
           />
         </label>
+      </div>
+      <div className="mt-6 border-t border-slate-200 pt-5">
+        <h3 className="text-base font-semibold text-slate-900">
+          從 WhatsApp 文字還原單列
+        </h3>
+        <p className="mt-1 text-sm text-slate-600">
+          若匯出後畫面資料消失，可把 WhatsApp 訊息全文貼上，還原對應日期那一列。
+        </p>
+        <textarea
+          value={whatsappPaste}
+          onChange={(e) => setWhatsappPaste(e.target.value)}
+          rows={8}
+          placeholder="貼上【日結單列】… 的完整文字"
+          className="mt-3 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+        />
+        <button
+          type="button"
+          onClick={restoreFromWhatsAppPaste}
+          disabled={pending || !whatsappPaste.trim()}
+          className="ledger-touch-btn ledger-btn-primary mt-2 rounded-full px-4 py-2.5 text-sm font-medium disabled:opacity-50"
+        >
+          還原此列
+        </button>
       </div>
       {message ? (
         <p className="mt-3 text-sm text-emerald-800">{message}</p>

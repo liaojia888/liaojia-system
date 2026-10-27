@@ -26,7 +26,7 @@ export async function fetchLedgerMonth(
   if (!organizationId) {
     return {
       ok: false,
-      error: orgError ?? "尚未建立公司，無法讀取雲端日結。",
+      error: orgError ?? "尚未建立公司，無法讀取 Supabase 日結。",
     };
   }
 
@@ -69,7 +69,7 @@ export async function saveLedgerMonth(
   if (!organizationId) {
     return {
       ok: false,
-      error: orgError ?? "尚未建立公司，無法儲存至雲端。",
+      error: orgError ?? "尚未建立公司，無法寫入 Supabase。",
     };
   }
 
@@ -106,7 +106,7 @@ export async function saveLedgerMonth(
       if (current.ok && current.data) {
         return {
           ok: false,
-          error: "雲端已有較新版本，請重新載入後再編輯。",
+          error: "Supabase 已有較新版本，請重新載入後再編輯。",
           conflict: current.data,
         };
       }
@@ -168,10 +168,17 @@ export type LedgerChangeLogEntry = {
   actorName: string | null;
 };
 
-export async function fetchLedgerChangeLogs(limit = 40): Promise<
+export async function fetchLedgerChangeLogs(options?: {
+  limit?: number;
+  /** ISO：含當日 00:00:00（本機時區換算後傳入） */
+  createdAfter?: string;
+  /** ISO：含當日 23:59:59.999（本機時區換算後傳入） */
+  createdBefore?: string;
+}): Promise<
   | { ok: true; entries: LedgerChangeLogEntry[] }
   | { ok: false; error: string }
 > {
+  const limit = options?.limit ?? 100;
   const { organizationId, error: orgError } =
     await getOrEnsureOrganizationId();
   if (!organizationId) {
@@ -179,7 +186,7 @@ export async function fetchLedgerChangeLogs(limit = 40): Promise<
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("daily_ledger_change_log")
     .select(
       `
@@ -195,6 +202,15 @@ export async function fetchLedgerChangeLogs(limit = 40): Promise<
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: false })
     .limit(limit);
+
+  if (options?.createdAfter) {
+    query = query.gte("created_at", options.createdAfter);
+  }
+  if (options?.createdBefore) {
+    query = query.lte("created_at", options.createdBefore);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     return { ok: false, error: error.message };

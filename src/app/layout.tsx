@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import { ThemeBootstrap } from "@/components/providers/ThemeBootstrap";
+import { DEFAULT_APP_THEME } from "@/lib/app-theme";
 import { Geist, Geist_Mono } from "next/font/google";
 import {
   PWA_APP_NAME,
@@ -54,6 +56,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="zh-Hant"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      data-app-theme={DEFAULT_APP_THEME}
       suppressHydrationWarning
     >
       <head>
@@ -67,13 +70,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <meta name="msapplication-TileColor" content={PWA_THEME_COLOR} />
         <meta name="msapplication-config" content="/icons/browserconfig.xml" />
         <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem("accounting-app-theme");if(t)document.documentElement.dataset.appTheme=t}catch(e){}`,
-          }}
-        />
       </head>
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        <ThemeBootstrap />
+        {children}
+      </body>
     </html>
   );
 }

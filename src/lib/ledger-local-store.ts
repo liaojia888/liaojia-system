@@ -8,6 +8,8 @@ import { broadcastLedgerMonthUpdated } from "@/lib/ledger-sync-events";
 type StoredLedger = {
   monthKey: string;
   rows: DailyLedgerRow[];
+  /** 本機最後寫入時間（ISO），用於避免被較舊的雲端覆蓋 */
+  clientSavedAt?: string;
 };
 
 export function loadLocalMonth(monthKey: string): DailyLedgerRow[] | null {
@@ -26,10 +28,25 @@ export function saveLocalMonth(monthKey: string, rows: DailyLedgerRow[]) {
   try {
     const raw = localStorage.getItem(LEDGER_STORAGE_KEY);
     const all = raw ? (JSON.parse(raw) as Record<string, StoredLedger>) : {};
-    all[monthKey] = { monthKey, rows };
+    all[monthKey] = {
+      monthKey,
+      rows,
+      clientSavedAt: new Date().toISOString(),
+    };
     localStorage.setItem(LEDGER_STORAGE_KEY, JSON.stringify(all));
   } catch {
     // ignore quota errors
+  }
+}
+
+export function loadLocalClientSavedAt(monthKey: string): string | null {
+  try {
+    const raw = localStorage.getItem(LEDGER_STORAGE_KEY);
+    if (!raw) return null;
+    const all = JSON.parse(raw) as Record<string, StoredLedger>;
+    return all[monthKey]?.clientSavedAt ?? null;
+  } catch {
+    return null;
   }
 }
 

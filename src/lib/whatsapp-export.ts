@@ -1,17 +1,16 @@
 import {
-  FPS_CHANNEL_OPTIONS,
+  formatExpenseEntriesSummary,
+  formatFpsEntriesSummary,
+  fpsLabel,
+  isExpenseEntryCounted,
+  isFpsEntryCounted,
   isLedgerRowActive,
   type DailyLedgerComputed,
   type DailyLedgerTotals,
-  type FpsChannel,
 } from "@/lib/daily-ledger";
 
 function money(n: number): string {
   return n.toLocaleString("zh-TW", { maximumFractionDigits: 0 });
-}
-
-function fpsLabel(channel: FpsChannel): string {
-  return FPS_CHANNEL_OPTIONS.find((o) => o.value === channel)?.label ?? "—";
 }
 
 function formatDateZh(iso: string): string {
@@ -21,9 +20,25 @@ function formatDateZh(iso: string): string {
 }
 
 function appendNotesBlock(row: DailyLedgerComputed): string {
+  const lines: string[] = [];
+  for (const entry of row.fpsEntries) {
+    if (entry.note?.trim()) {
+      lines.push(
+        `  · 轉數快 ${fpsLabel(entry.channel)}：${entry.note.trim()}`,
+      );
+    }
+  }
+  for (const entry of row.expenseEntries) {
+    if (entry.note?.trim()) {
+      const head = entry.label.trim() || "支出";
+      lines.push(`  · ${head}：${entry.note.trim()}`);
+    }
+  }
   const entries = Object.entries(row.notes ?? {}).filter(([, v]) => v?.trim());
-  if (!entries.length) return "";
-  const lines = entries.map(([key, text]) => `  · ${noteKeyLabel(key)}：${text}`);
+  for (const [key, text] of entries) {
+    lines.push(`  · ${noteKeyLabel(key)}：${text}`);
+  }
+  if (!lines.length) return "";
   return `\n備註：\n${lines.join("\n")}`;
 }
 
@@ -39,6 +54,34 @@ function noteKeyLabel(key: string): string {
     expenses: "支出",
   };
   return map[key] ?? key;
+}
+
+function formatExpenseBlock(row: DailyLedgerComputed): string {
+  const active = row.expenseEntries.filter(isExpenseEntryCounted);
+  if (!active.length) return "支出：—";
+  if (active.length === 1) {
+    const e = active[0];
+    const head = e.label.trim() ? e.label.trim() : "支出";
+    return `支出：${head} ${money(e.amount)}`;
+  }
+  return `支出：\n${active
+    .map((e) => {
+      const head = e.label.trim() ? e.label.trim() : "支出";
+      return `  · ${head} ${money(e.amount)}`;
+    })
+    .join("\n")}`;
+}
+
+function formatFpsBlock(row: DailyLedgerComputed): string {
+  const active = row.fpsEntries.filter(isFpsEntryCounted);
+  if (!active.length) return "轉數快：—";
+  if (active.length === 1) {
+    const e = active[0];
+    return `轉數快：${fpsLabel(e.channel)} ${money(e.amount)}`;
+  }
+  return `轉數快：\n${active
+    .map((e) => `  · ${fpsLabel(e.channel)} ${money(e.amount)}`)
+    .join("\n")}`;
 }
 
 export function formatLedgerRowForWhatsApp(
@@ -58,11 +101,11 @@ export function formatLedgerRowForWhatsApp(
     `尿素收入：${money(row.urea)}`,
     `品項小計：${money(row.productSubtotal)}`,
     "",
-    `轉數快：${fpsLabel(row.fpsChannel)} ${money(row.fpsAmount)}`,
+    formatFpsBlock(row),
     `已入銀行（公司）：${money(row.bankDeposited)}`,
     `待入銀行（公司）：${money(row.bankPending)}`,
     `撤單：${money(row.cancelled)}`,
-    `支出：${money(row.expenses)}`,
+    formatExpenseBlock(row),
     balanceLine,
     appendNotesBlock(row),
   ]
@@ -84,11 +127,14 @@ export function formatLedgerMonthForWhatsApp(
       ? "（本月尚無填寫資料）"
       : activeRows
           .map((row) => {
+            const fps = formatFpsEntriesSummary(row.fpsEntries) || "—";
+            const exp =
+              formatExpenseEntriesSummary(row.expenseEntries) || "—";
             return [
               `▸ ${formatDateZh(row.date)}`,
               `  油/水/尿素：${money(row.fuel)}/${money(row.water)}/${money(row.urea)}`,
-              `  轉數快 ${fpsLabel(row.fpsChannel)}：${money(row.fpsAmount)} | 入銀：${money(row.bankDeposited)} | 待入：${money(row.bankPending)}`,
-              `  撤單：${money(row.cancelled)} | 支出：${money(row.expenses)} | 尾數：${money(row.balance)}`,
+              `  轉數快 ${fps} | 入銀：${money(row.bankDeposited)} | 待入：${money(row.bankPending)}`,
+              `  撤單：${money(row.cancelled)} | 支出 ${exp} | 尾數：${money(row.balance)}`,
             ].join("\n");
           })
           .join("\n");
@@ -107,21 +153,86 @@ export function formatLedgerMonthForWhatsApp(
   ].join("\n");
 }
 
-const WHATSAPP_MAX_TEXT = 3500;
+const SHARE_MAX_TEXT = 3500;
 
-export function openWhatsAppShare(text: string): { ok: boolean; error?: string } {
+export type ShareTextResult =
+  | { ok: true; text: string }
+  | { ok: false; error: string };
+
+export function prepareShareText(text: string): ShareTextResult {
   const trimmed = text.trim();
   if (!trimmed) {
     return { ok: false, error: "沒有可匯出的內容" };
   }
-  if (trimmed.length > WHATSAPP_MAX_TEXT) {
+  if (trimmed.length > SHARE_MAX_TEXT) {
     return {
       ok: false,
       error: "內容過長，請改用「匯出此列」或減少列數後再試",
     };
   }
+  return { ok: true, text: trimmed };
+}
 
-  const url = `https://wa.me/?text=${encodeURIComponent(trimmed)}`;
+async function copyTextToClipboard(text: string): Promise<void> {
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.position = "fixed";
+  ta.style.left = "-9999px";
+  document.body.appendChild(ta);
+  ta.select();
+  const ok = document.execCommand("copy");
+  document.body.removeChild(ta);
+  if (!ok) throw new Error("copy failed");
+}
+
+export function openWhatsAppShare(text: string): { ok: boolean; error?: string } {
+  const prepared = prepareShareText(text);
+  if (!prepared.ok) return prepared;
+
+  const url = `https://wa.me/?text=${encodeURIComponent(prepared.text)}`;
   window.open(url, "_blank", "noopener,noreferrer");
   return { ok: true };
+}
+
+export type WeChatShareResult = {
+  ok: boolean;
+  error?: string;
+  /** share＝系統分享 sheet；clipboard＝已複製，需自行到微信貼上 */
+  mode?: "share" | "clipboard";
+};
+
+/** 微信無公開網址帶文；優先 Web Share，否則複製到剪貼簿 */
+export async function shareViaWeChat(text: string): Promise<WeChatShareResult> {
+  const prepared = prepareShareText(text);
+  if (!prepared.ok) return prepared;
+
+  if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+    try {
+      await navigator.share({ text: prepared.text });
+      return { ok: true, mode: "share" };
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        return { ok: false, error: "已取消分享" };
+      }
+    }
+  }
+
+  try {
+    await copyTextToClipboard(prepared.text);
+    return { ok: true, mode: "clipboard" };
+  } catch {
+    return { ok: false, error: "無法複製到剪貼簿，請改用 WhatsApp 或 CSV 匯出" };
+  }
+}
+
+export function weChatShareSuccessMessage(mode: WeChatShareResult["mode"]): string | null {
+  if (mode === "clipboard") {
+    return "已複製到剪貼簿，請開啟微信並貼上分享。";
+  }
+  return null;
 }

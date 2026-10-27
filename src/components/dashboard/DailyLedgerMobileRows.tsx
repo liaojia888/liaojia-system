@@ -2,16 +2,20 @@
 
 import {
   FPS_CHANNEL_OPTIONS,
+  createEmptyExpenseEntry,
+  createEmptyFpsEntry,
   isLedgerRowActive,
   type DailyLedgerComputed,
   type DailyLedgerRow,
+  type ExpenseEntry,
   type FpsChannel,
+  type FpsEntry,
   type LedgerNoteKey,
   type DailyLedgerTotals,
 } from "@/lib/daily-ledger";
 
 const FIELD_LABELS: Record<
-  "fuel" | "water" | "urea" | "bankDeposited" | "bankPending" | "cancelled" | "expenses",
+  "fuel" | "water" | "urea" | "bankDeposited" | "bankPending" | "cancelled",
   string
 > = {
   fuel: "油",
@@ -20,7 +24,11 @@ const FIELD_LABELS: Record<
   bankDeposited: "已入銀行",
   bankPending: "待入銀行",
   cancelled: "撤單",
-  expenses: "支出",
+};
+
+type LineEntryNoteTarget = {
+  fpsEntryId?: string;
+  expenseEntryId?: string;
 };
 
 export function DailyLedgerMobileRows({
@@ -31,6 +39,8 @@ export function DailyLedgerMobileRows({
   parseNum,
   getNote,
   updateRow,
+  setFpsEntries,
+  setExpenseEntries,
   openRowMenu,
   openCellMenu,
 }: {
@@ -41,11 +51,14 @@ export function DailyLedgerMobileRows({
   parseNum: (raw: string) => number;
   getNote: (row: DailyLedgerRow, noteKey: LedgerNoteKey) => string | undefined;
   updateRow: (id: string, patch: Partial<DailyLedgerRow>) => void;
+  setFpsEntries: (rowId: string, entries: FpsEntry[]) => void;
+  setExpenseEntries: (rowId: string, entries: ExpenseEntry[]) => void;
   openRowMenu: (rowId: string, el: HTMLElement) => void;
   openCellMenu: (
     rowId: string,
     noteKey: LedgerNoteKey,
     el: HTMLElement,
+    entryTarget?: LineEntryNoteTarget,
   ) => void;
 }) {
   return (
@@ -93,48 +106,183 @@ export function DailyLedgerMobileRows({
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="block text-xs font-medium text-slate-600">
-              轉數快方式
-              <select
-                value={row.fpsChannel}
-                onChange={(e) =>
-                  updateRow(row.id, {
-                    fpsChannel: e.target.value as FpsChannel,
-                  })
+          <div className="mt-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-700">
+                轉數快（FPS）
+                <span className="ml-1 font-normal text-slate-500">
+                  金額旁可備註
+                </span>
+              </span>
+              <button
+                type="button"
+                className="rounded-md border border-dashed border-slate-300 px-2 py-1 text-xs font-medium text-emerald-800"
+                onClick={() =>
+                  setFpsEntries(row.id, [...row.fpsEntries, createEmptyFpsEntry()])
                 }
-                className="ledger-touch-input mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
               >
-                {FPS_CHANNEL_OPTIONS.map((opt) => (
-                  <option key={opt.value || "empty"} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <MobileAmountField
-              label="轉數快金額"
-              note={getNote(row, "fpsAmount")}
-              showAllNotes={showAllNotes}
-              value={row.fpsAmount}
-              disabled={!row.fpsChannel}
-              placeholder={row.fpsChannel ? "0" : "先選方式"}
-              formatNum={formatNum}
-              parseNum={parseNum}
-              onChange={(v) => updateRow(row.id, { fpsAmount: v })}
-              onNotePress={(el) => openCellMenu(row.id, "fpsAmount", el)}
-            />
+                ＋ 新增
+              </button>
+            </div>
+            {row.fpsEntries.length === 0 ? (
+              <p className="text-xs text-slate-400">尚無轉數快</p>
+            ) : (
+              row.fpsEntries.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="grid grid-cols-1 gap-2 rounded-lg border border-slate-100 bg-slate-50/50 p-2 sm:grid-cols-[1fr_1fr_auto]"
+                >
+                  <label className="block text-xs font-medium text-slate-600">
+                    方式
+                    <select
+                      value={entry.channel}
+                      onChange={(e) => {
+                        const channel = e.target.value as FpsChannel;
+                        setFpsEntries(
+                          row.id,
+                          row.fpsEntries.map((item) =>
+                            item.id === entry.id ? { ...item, channel } : item,
+                          ),
+                        );
+                      }}
+                      className="ledger-touch-input mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
+                    >
+                      {FPS_CHANNEL_OPTIONS.map((opt) => (
+                        <option key={opt.value || "empty"} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <MobileAmountField
+                    label="金額"
+                    note={entry.note}
+                    showAllNotes={showAllNotes}
+                    value={entry.amount}
+                    disabled={!entry.channel}
+                    placeholder={entry.channel ? "0" : "先選方式"}
+                    formatNum={formatNum}
+                    parseNum={parseNum}
+                    onChange={(v) =>
+                      setFpsEntries(
+                        row.id,
+                        row.fpsEntries.map((item) =>
+                          item.id === entry.id ? { ...item, amount: v } : item,
+                        ),
+                      )
+                    }
+                    onNotePress={(el) =>
+                      openCellMenu(row.id, "fpsAmount", el, {
+                        fpsEntryId: entry.id,
+                      })
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="self-end rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-600 sm:self-center"
+                    onClick={() =>
+                      setFpsEntries(
+                        row.id,
+                        row.fpsEntries.filter((item) => item.id !== entry.id),
+                      )
+                    }
+                  >
+                    移除
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="mt-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-700">
+                支出
+                <span className="ml-1 font-normal text-slate-500">
+                  項目＋金額，金額旁可備註
+                </span>
+              </span>
+              <button
+                type="button"
+                className="rounded-md border border-dashed border-slate-300 px-2 py-1 text-xs font-medium text-emerald-800"
+                onClick={() =>
+                  setExpenseEntries(row.id, [
+                    ...row.expenseEntries,
+                    createEmptyExpenseEntry(),
+                  ])
+                }
+              >
+                ＋ 新增
+              </button>
+            </div>
+            {row.expenseEntries.length === 0 ? (
+              <p className="text-xs text-slate-400">尚無支出</p>
+            ) : (
+              row.expenseEntries.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="grid grid-cols-1 gap-2 rounded-lg border border-slate-100 bg-slate-50/50 p-2 sm:grid-cols-[1fr_1fr_auto]"
+                >
+                  <label className="block text-xs font-medium text-slate-600">
+                    項目
+                    <input
+                      type="text"
+                      value={entry.label}
+                      onChange={(e) =>
+                        setExpenseEntries(
+                          row.id,
+                          row.expenseEntries.map((item) =>
+                            item.id === entry.id
+                              ? { ...item, label: e.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                      placeholder="例如：運輸"
+                      className="ledger-touch-input mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
+                    />
+                  </label>
+                  <MobileAmountField
+                    label="金額"
+                    note={entry.note}
+                    showAllNotes={showAllNotes}
+                    value={entry.amount}
+                    formatNum={formatNum}
+                    parseNum={parseNum}
+                    onChange={(v) =>
+                      setExpenseEntries(
+                        row.id,
+                        row.expenseEntries.map((item) =>
+                          item.id === entry.id ? { ...item, amount: v } : item,
+                        ),
+                      )
+                    }
+                    onNotePress={(el) =>
+                      openCellMenu(row.id, "expenses", el, {
+                        expenseEntryId: entry.id,
+                      })
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="self-end rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-600 sm:self-center"
+                    onClick={() =>
+                      setExpenseEntries(
+                        row.id,
+                        row.expenseEntries.filter((item) => item.id !== entry.id),
+                      )
+                    }
+                  >
+                    移除
+                  </button>
+                </div>
+              ))
+            )}
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-3">
-            {(
-              [
-                "bankDeposited",
-                "bankPending",
-                "cancelled",
-                "expenses",
-              ] as const
-            ).map((field) => (
+            {(["bankDeposited", "bankPending", "cancelled"] as const).map(
+              (field) => (
               <MobileAmountField
                 key={field}
                 label={FIELD_LABELS[field]}
@@ -146,7 +294,8 @@ export function DailyLedgerMobileRows({
                 onChange={(v) => updateRow(row.id, { [field]: v })}
                 onNotePress={(el) => openCellMenu(row.id, field, el)}
               />
-            ))}
+            ),
+            )}
           </div>
 
           <div className="mt-3 flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5">

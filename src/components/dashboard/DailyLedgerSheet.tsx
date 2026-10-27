@@ -5,11 +5,15 @@ import {
   computeRows,
   computeTotals,
   createEmptyRow,
+  createEmptyFpsEntry,
+  createEmptyExpenseEntry,
   sortRowsByDate,
   FPS_CHANNEL_OPTIONS,
   isLedgerRowActive,
   type DailyLedgerRow,
+  type ExpenseEntry,
   type FpsChannel,
+  type FpsEntry,
   type LedgerNoteKey,
   type LedgerNotes,
 } from "@/lib/daily-ledger";
@@ -25,6 +29,8 @@ import {
   formatLedgerMonthForWhatsApp,
   formatLedgerRowForWhatsApp,
   openWhatsAppShare,
+  shareViaWeChat,
+  weChatShareSuccessMessage,
 } from "@/lib/whatsapp-export";
 import { DailyLedgerMobileRows } from "@/components/dashboard/DailyLedgerMobileRows";
 import { LogoutButton } from "@/components/layout/LogoutButton";
@@ -50,8 +56,12 @@ const OTHER_PAYMENT_FIELDS = [
   "bankDeposited",
   "bankPending",
   "cancelled",
-  "expenses",
 ] as const;
+
+type LineEntryNoteTarget = {
+  fpsEntryId?: string;
+  expenseEntryId?: string;
+};
 
 export function DailyLedgerSheet({
   organizationId,
@@ -77,7 +87,12 @@ export function DailyLedgerSheet({
     syncMessage,
     cloudConflict,
     applyCloudVersion,
+    dismissCloudConflict,
     reloadMonth,
+    persistBeforeShare,
+    saveToCloud,
+    cloudDirty,
+    isSavingCloud,
   } = useLedgerMonthData({
     monthKey: key,
     year,
@@ -98,12 +113,35 @@ export function DailyLedgerSheet({
   );
 
   const updateNote = useCallback(
-    (rowId: string, noteKey: LedgerNoteKey, text: string) => {
+    (
+      rowId: string,
+      noteKey: LedgerNoteKey,
+      text: string,
+      entryTarget?: LineEntryNoteTarget,
+    ) => {
       setRows((prev) =>
         prev.map((row) => {
           if (row.id !== rowId) return row;
-          const notes: LedgerNotes = { ...row.notes };
           const trimmed = text.trim();
+          if (entryTarget?.fpsEntryId) {
+            const fpsEntries = row.fpsEntries.map((entry) => {
+              if (entry.id !== entryTarget.fpsEntryId) return entry;
+              if (trimmed) return { ...entry, note: trimmed };
+              const { note: _n, ...rest } = entry;
+              return rest;
+            });
+            return { ...row, fpsEntries };
+          }
+          if (entryTarget?.expenseEntryId) {
+            const expenseEntries = row.expenseEntries.map((entry) => {
+              if (entry.id !== entryTarget.expenseEntryId) return entry;
+              if (trimmed) return { ...entry, note: trimmed };
+              const { note: _n, ...rest } = entry;
+              return rest;
+            });
+            return { ...row, expenseEntries };
+          }
+          const notes: LedgerNotes = { ...row.notes };
           if (trimmed) notes[noteKey] = trimmed;
           else delete notes[noteKey];
           return { ...row, notes };
@@ -113,12 +151,33 @@ export function DailyLedgerSheet({
     [],
   );
 
+  const setFpsEntries = useCallback(
+    (rowId: string, fpsEntries: FpsEntry[]) => {
+      updateRow(rowId, { fpsEntries });
+    },
+    [updateRow],
+  );
+
+  const setExpenseEntries = useCallback(
+    (rowId: string, expenseEntries: ExpenseEntry[]) => {
+      updateRow(rowId, { expenseEntries });
+    },
+    [updateRow],
+  );
+
   const openContextMenu = useCallback(
-    (e: React.MouseEvent, rowId: string, noteKey: LedgerNoteKey) => {
+    (
+      e: React.MouseEvent,
+      rowId: string,
+      noteKey: LedgerNoteKey,
+      entryTarget?: LineEntryNoteTarget,
+    ) => {
       e.preventDefault();
       setContextMenu({
         rowId,
         noteKey,
+        fpsEntryId: entryTarget?.fpsEntryId,
+        expenseEntryId: entryTarget?.expenseEntryId,
         x: e.clientX,
         y: e.clientY,
       });
@@ -140,11 +199,14 @@ export function DailyLedgerSheet({
       rowId: string,
       noteKey: LedgerNoteKey | undefined,
       anchor: HTMLElement,
+      entryTarget?: LineEntryNoteTarget,
     ) => {
       const rect = anchor.getBoundingClientRect();
       setContextMenu({
         rowId,
         noteKey,
+        fpsEntryId: entryTarget?.fpsEntryId,
+        expenseEntryId: entryTarget?.expenseEntryId,
         x: Math.min(rect.left, window.innerWidth - 200),
         y: rect.bottom + 4,
       });
@@ -199,6 +261,17 @@ export function DailyLedgerSheet({
     if (!contextMenu) return "";
     const row = rows.find((r) => r.id === contextMenu.rowId);
     if (!row || !contextMenu.noteKey) return "";
+    if (contextMenu.fpsEntryId) {
+      return (
+        row.fpsEntries.find((e) => e.id === contextMenu.fpsEntryId)?.note ?? ""
+      );
+    }
+    if (contextMenu.expenseEntryId) {
+      return (
+        row.expenseEntries.find((e) => e.id === contextMenu.expenseEntryId)
+          ?.note ?? ""
+      );
+    }
     return getNote(row, contextMenu.noteKey) ?? "";
   }, [contextMenu, rows, getNote]);
 
@@ -212,23 +285,34 @@ export function DailyLedgerSheet({
     syncStatus === "loading"
       ? "載入中…"
       : syncStatus === "syncing"
-        ? "同步至雲端…"
+        ? "寫入 Supabase…"
         : syncStatus === "synced"
-          ? "已與 Supabase 同步"
-          : syncStatus === "local_only"
-            ? "僅本機（未連公司）"
-            : syncStatus === "conflict"
-              ? "雲端版本較新"
-              : syncStatus === "error"
-                ? "同步失敗"
-                : "";
+          ? "已寫入 Supabase"
+          : syncStatus === "cloud_pending"
+            ? "已存本機 · Supabase 尚未更新"
+            : syncStatus === "local_saved"
+              ? "已存本機（需手動存 Supabase）"
+              : syncStatus === "local_only"
+                ? "僅本機（未連公司）"
+                : syncStatus === "conflict"
+                  ? "Supabase 版本衝突"
+                  : syncStatus === "error"
+                    ? "Supabase 儲存失敗"
+                    : "";
+
+  async function handleSaveToCloud() {
+    const result = await saveToCloud();
+    if (!result.ok) {
+      alert(result.error);
+    }
+  }
 
   function exportCsv() {
     const csv = buildMonthCsv(key, sortRowsByDate(rows), computed);
     downloadTextFile(`日結-${key}.csv`, csv, "text/csv;charset=utf-8");
   }
 
-  if (!ready) {
+  if (!ready && rows.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
         載入日結表…
@@ -255,8 +339,13 @@ export function DailyLedgerSheet({
                 手機／平板：每列「列操作」或「＋備註」；電腦可右鍵操作。
               </span>
               <span className="hidden lg:inline">
-                右鍵可新增／移除列、備註與清空該列；備註顯示在格內右上角。
+                右鍵可新增／移除列、備註與清空該列；轉數快／支出每筆金額旁可按「＋備註」。
               </span>
+              {organizationId ? (
+                <span className="mt-1 block text-[var(--theme-accent-strong)]">
+                  編輯會自動存本機；寫入 Supabase 資料庫請按「儲存至 Supabase」。
+                </span>
+              ) : null}
             </p>
             {syncLabel ? (
               <p className="mt-2 text-xs font-medium text-[var(--theme-accent-strong)]">
@@ -266,6 +355,18 @@ export function DailyLedgerSheet({
             ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
+            {organizationId ? (
+              <button
+                type="button"
+                onClick={() => void handleSaveToCloud()}
+                disabled={isSavingCloud}
+                className={`ledger-touch-btn rounded-full px-4 py-2.5 text-sm font-medium shadow-sm sm:py-2 ${
+                  cloudDirty ? "ledger-btn-primary" : "ledger-btn-ghost"
+                }`}
+              >
+                {isSavingCloud ? "寫入中…" : "儲存至 Supabase"}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={exportCsv}
@@ -308,22 +409,30 @@ export function DailyLedgerSheet({
         {cloudConflict ? (
           <div className="mt-4 flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between">
             <p>
-              其他裝置或使用者已更新此月份。請選擇載入雲端版本，或先備份後再覆寫。
+              Supabase 上的版本與您目前畫面不同（常見於尚未按「儲存至 Supabase」或資料庫只有舊資料）。
+              請保留本機並按「儲存至 Supabase」覆寫資料庫；若要以資料庫為準再選合併。
             </p>
-            <div className="flex shrink-0 gap-2">
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={dismissCloudConflict}
+                className="rounded-full bg-emerald-800 px-3 py-1.5 text-xs font-medium text-white"
+              >
+                保留本機畫面
+              </button>
               <button
                 type="button"
                 onClick={() => void reloadMonth()}
                 className="rounded-full border border-amber-400 px-3 py-1.5 text-xs font-medium"
               >
-                重新載入
+                重讀本機快取
               </button>
               <button
                 type="button"
                 onClick={applyCloudVersion}
-                className="rounded-full bg-amber-800 px-3 py-1.5 text-xs font-medium text-white"
+                className="rounded-full border border-amber-600 px-3 py-1.5 text-xs font-medium"
               >
-                使用雲端資料
+                合併 Supabase 資料
               </button>
             </div>
           </div>
@@ -348,9 +457,11 @@ export function DailyLedgerSheet({
             getNote={getNote}
             updateRow={updateRow}
             openRowMenu={(rowId, el) => openMenuFromAnchor(rowId, undefined, el)}
-            openCellMenu={(rowId, noteKey, el) =>
-              openMenuFromAnchor(rowId, noteKey, el)
+            openCellMenu={(rowId, noteKey, el, entryTarget) =>
+              openMenuFromAnchor(rowId, noteKey, el, entryTarget)
             }
+            setFpsEntries={setFpsEntries}
+            setExpenseEntries={setExpenseEntries}
           />
         </div>
 
@@ -390,8 +501,11 @@ export function DailyLedgerSheet({
                 <th rowSpan={2} className="ledger-th">
                   撤單
                 </th>
-                <th rowSpan={2} className="ledger-th">
+                <th rowSpan={2} className="ledger-th min-w-[11rem]">
                   支出
+                  <span className="block text-[10px] font-normal opacity-90">
+                    可多筆
+                  </span>
                 </th>
                 <th rowSpan={2} className="ledger-th ledger-th-accent min-w-[5.5rem]">
                   尾數
@@ -446,22 +560,28 @@ export function DailyLedgerSheet({
                   >
                     {formatNum(row.productSubtotal)}
                   </td>
-                  <FpsCell
-                    channel={row.fpsChannel}
-                    amount={row.fpsAmount}
-                    amountNote={getNote(row, "fpsAmount")}
+                  <FpsEntriesCell
+                    entries={row.fpsEntries}
                     showAllNotes={showAllNotes}
                     formatNum={formatNum}
                     parseNum={parseNum}
-                    onChannelChange={(fpsChannel) =>
-                      updateRow(row.id, { fpsChannel })
+                    onChange={(fpsEntries) =>
+                      setFpsEntries(row.id, fpsEntries)
                     }
-                    onAmountChange={(fpsAmount) =>
-                      updateRow(row.id, { fpsAmount })
+                    onAmountContextMenu={(e, entryId) =>
+                      openContextMenu(e, row.id, "fpsAmount", {
+                        fpsEntryId: entryId,
+                      })
                     }
-                    onAmountContextMenu={(e) =>
-                      openContextMenu(e, row.id, "fpsAmount")
-                    }
+                    onEditEntryNote={(entryId) => {
+                      const entry = row.fpsEntries.find((e) => e.id === entryId);
+                      setNoteEditor({
+                        rowId: row.id,
+                        noteKey: "fpsAmount",
+                        fpsEntryId: entryId,
+                        initialText: entry?.note ?? "",
+                      });
+                    }}
                     onRowContextMenu={(e) => openRowContextMenu(e, row.id)}
                   />
                   {OTHER_PAYMENT_FIELDS.map((field) => (
@@ -479,6 +599,32 @@ export function DailyLedgerSheet({
                       }
                     />
                   ))}
+                  <ExpenseEntriesCell
+                    entries={row.expenseEntries}
+                    showAllNotes={showAllNotes}
+                    formatNum={formatNum}
+                    parseNum={parseNum}
+                    onChange={(expenseEntries) =>
+                      setExpenseEntries(row.id, expenseEntries)
+                    }
+                    onAmountContextMenu={(e, entryId) =>
+                      openContextMenu(e, row.id, "expenses", {
+                        expenseEntryId: entryId,
+                      })
+                    }
+                    onEditEntryNote={(entryId) => {
+                      const entry = row.expenseEntries.find(
+                        (e) => e.id === entryId,
+                      );
+                      setNoteEditor({
+                        rowId: row.id,
+                        noteKey: "expenses",
+                        expenseEntryId: entryId,
+                        initialText: entry?.note ?? "",
+                      });
+                    }}
+                    onRowContextMenu={(e) => openRowContextMenu(e, row.id)}
+                  />
                   <td
                     className="ledger-td computed font-medium text-emerald-900"
                     onContextMenu={(e) => openRowContextMenu(e, row.id)}
@@ -519,7 +665,7 @@ export function DailyLedgerSheet({
                 <td className="ledger-td text-right tabular-nums">
                   {formatNum(totals.cancelled)}
                 </td>
-                <td className="ledger-td text-right tabular-nums">
+                <td className="ledger-td text-right tabular-nums align-top">
                   {formatNum(totals.expenses)}
                 </td>
                 <td className="ledger-td text-right tabular-nums text-emerald-800">
@@ -528,7 +674,7 @@ export function DailyLedgerSheet({
               </tr>
               <tr className="bg-emerald-50 text-xs text-slate-600">
                 <td colSpan={12} className="px-3 py-2">
-                  右鍵：備註、列操作、WhatsApp 匯出 ·
+                  右鍵：備註、列操作、WhatsApp／微信匯出 ·
                   尾數＝前日結存＋當日收支（僅在有填資料的列顯示；未填列仍沿用前日結存計算下一列）
                 </td>
               </tr>
@@ -548,12 +694,22 @@ export function DailyLedgerSheet({
           setNoteEditor({
             rowId: contextMenu.rowId,
             noteKey: contextMenu.noteKey,
+            fpsEntryId: contextMenu.fpsEntryId,
+            expenseEntryId: contextMenu.expenseEntryId,
             initialText: contextNoteText,
           });
         }}
         onClearNote={() => {
           if (!contextMenu?.noteKey) return;
-          updateNote(contextMenu.rowId, contextMenu.noteKey, "");
+          updateNote(
+            contextMenu.rowId,
+            contextMenu.noteKey,
+            "",
+            {
+              fpsEntryId: contextMenu.fpsEntryId,
+              expenseEntryId: contextMenu.expenseEntryId,
+            },
+          );
         }}
         onInsertRow={() => {
           if (!contextMenu) return;
@@ -571,25 +727,85 @@ export function DailyLedgerSheet({
           if (!contextMenu) return;
           const row = computed.find((r) => r.id === contextMenu.rowId);
           if (!row) return;
-          const result = openWhatsAppShare(
-            formatLedgerRowForWhatsApp(
-              row,
-              readLocalCompanyName() ?? "我的公司",
-            ),
-          );
-          if (!result.ok && result.error) alert(result.error);
+          void (async () => {
+            const saved = await persistBeforeShare();
+            if (!saved.ok) {
+              alert(saved.error);
+              return;
+            }
+            const result = openWhatsAppShare(
+              formatLedgerRowForWhatsApp(
+                row,
+                readLocalCompanyName() ?? "我的公司",
+              ),
+            );
+            if (!result.ok && result.error) alert(result.error);
+          })();
         }}
         onWhatsAppMonth={() => {
-          const result = openWhatsAppShare(
-            formatLedgerMonthForWhatsApp(
-              computed,
-              totals,
-              year,
-              month,
-              readLocalCompanyName() ?? "我的公司",
-            ),
-          );
-          if (!result.ok && result.error) alert(result.error);
+          void (async () => {
+            const saved = await persistBeforeShare();
+            if (!saved.ok) {
+              alert(saved.error);
+              return;
+            }
+            const result = openWhatsAppShare(
+              formatLedgerMonthForWhatsApp(
+                computed,
+                totals,
+                year,
+                month,
+                readLocalCompanyName() ?? "我的公司",
+              ),
+            );
+            if (!result.ok && result.error) alert(result.error);
+          })();
+        }}
+        onWeChatRow={() => {
+          if (!contextMenu) return;
+          const row = computed.find((r) => r.id === contextMenu.rowId);
+          if (!row) return;
+          void (async () => {
+            const saved = await persistBeforeShare();
+            if (!saved.ok) {
+              alert(saved.error);
+              return;
+            }
+            const result = await shareViaWeChat(
+              formatLedgerRowForWhatsApp(
+                row,
+                readLocalCompanyName() ?? "我的公司",
+              ),
+            );
+            if (!result.ok && result.error) alert(result.error);
+            else {
+              const msg = weChatShareSuccessMessage(result.mode);
+              if (msg) alert(msg);
+            }
+          })();
+        }}
+        onWeChatMonth={() => {
+          void (async () => {
+            const saved = await persistBeforeShare();
+            if (!saved.ok) {
+              alert(saved.error);
+              return;
+            }
+            const result = await shareViaWeChat(
+              formatLedgerMonthForWhatsApp(
+                computed,
+                totals,
+                year,
+                month,
+                readLocalCompanyName() ?? "我的公司",
+              ),
+            );
+            if (!result.ok && result.error) alert(result.error);
+            else {
+              const msg = weChatShareSuccessMessage(result.mode);
+              if (msg) alert(msg);
+            }
+          })();
         }}
       />
 
@@ -599,7 +815,15 @@ export function DailyLedgerSheet({
         onClose={() => setNoteEditor(null)}
         onSave={(text) => {
           if (!noteEditor) return;
-          updateNote(noteEditor.rowId, noteEditor.noteKey, text);
+          updateNote(
+            noteEditor.rowId,
+            noteEditor.noteKey,
+            text,
+            {
+              fpsEntryId: noteEditor.fpsEntryId,
+              expenseEntryId: noteEditor.expenseEntryId,
+            },
+          );
           setNoteEditor(null);
         }}
       />
@@ -607,57 +831,186 @@ export function DailyLedgerSheet({
   );
 }
 
-function FpsCell({
-  channel,
-  amount,
-  amountNote,
+function ExpenseEntriesCell({
+  entries,
   showAllNotes,
   formatNum,
   parseNum,
-  onChannelChange,
-  onAmountChange,
+  onChange,
   onAmountContextMenu,
+  onEditEntryNote,
   onRowContextMenu,
 }: {
-  channel: FpsChannel;
-  amount: number;
-  amountNote?: string;
+  entries: ExpenseEntry[];
   showAllNotes: boolean;
   formatNum: (n: number) => string;
   parseNum: (raw: string) => number;
-  onChannelChange: (channel: FpsChannel) => void;
-  onAmountChange: (amount: number) => void;
-  onAmountContextMenu: (e: React.MouseEvent) => void;
+  onChange: (entries: ExpenseEntry[]) => void;
+  onAmountContextMenu: (e: React.MouseEvent, entryId: string) => void;
+  onEditEntryNote: (entryId: string) => void;
   onRowContextMenu: (e: React.MouseEvent) => void;
 }) {
+  const updateEntry = (id: string, patch: Partial<ExpenseEntry>) => {
+    onChange(entries.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+  };
+
+  const removeEntry = (id: string) => {
+    onChange(entries.filter((e) => e.id !== id));
+  };
+
+  const addEntry = () => {
+    onChange([...entries, createEmptyExpenseEntry()]);
+  };
+
   return (
-    <>
-      <td className="ledger-td" onContextMenu={onRowContextMenu}>
-        <select
-          value={channel}
-          onChange={(e) => onChannelChange(e.target.value as FpsChannel)}
-          className="ledger-input w-full min-w-[7rem] cursor-pointer text-sm"
+    <td className="ledger-td align-top" onContextMenu={onRowContextMenu}>
+      <div className="flex min-w-[10rem] flex-col gap-1.5 py-0.5">
+        {entries.length === 0 ? (
+          <p className="text-xs text-slate-400">尚無支出</p>
+        ) : (
+          entries.map((entry) => (
+            <div key={entry.id} className="flex items-start gap-1">
+              <input
+                type="text"
+                value={entry.label}
+                onChange={(e) =>
+                  updateEntry(entry.id, { label: e.target.value })
+                }
+                placeholder="項目"
+                className="ledger-input min-w-0 flex-1 text-sm"
+              />
+              <div className="min-w-[5.5rem] flex-1">
+                <NotableAmountCell
+                  variant="inline"
+                  noteKey="expenses"
+                  note={entry.note}
+                  showAllNotes={showAllNotes}
+                  value={entry.amount}
+                  placeholder="0"
+                  formatNum={formatNum}
+                  parseNum={parseNum}
+                  onValueChange={(amount) => updateEntry(entry.id, { amount })}
+                  onContextMenu={(e) => onAmountContextMenu(e, entry.id)}
+                  onEditNote={() => onEditEntryNote(entry.id)}
+                />
+              </div>
+              <button
+                type="button"
+                className="mt-1 shrink-0 rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100"
+                title="移除此筆支出"
+                onClick={() => removeEntry(entry.id)}
+              >
+                ×
+              </button>
+            </div>
+          ))
+        )}
+        <button
+          type="button"
+          className="self-start rounded-md border border-dashed border-slate-300 px-2 py-0.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50"
+          onClick={addEntry}
         >
-          {FPS_CHANNEL_OPTIONS.map((opt) => (
-            <option key={opt.value || "empty"} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </td>
-      <NotableAmountCell
-        noteKey="fpsAmount"
-        note={amountNote}
-        showAllNotes={showAllNotes}
-        value={amount}
-        disabled={!channel}
-        placeholder={channel ? "0" : "先選方式"}
-        formatNum={formatNum}
-        parseNum={parseNum}
-        onValueChange={onAmountChange}
-        onContextMenu={(e) => onAmountContextMenu(e)}
-      />
-    </>
+          ＋ 支出
+        </button>
+      </div>
+    </td>
+  );
+}
+
+function FpsEntriesCell({
+  entries,
+  showAllNotes,
+  formatNum,
+  parseNum,
+  onChange,
+  onAmountContextMenu,
+  onEditEntryNote,
+  onRowContextMenu,
+}: {
+  entries: FpsEntry[];
+  showAllNotes: boolean;
+  formatNum: (n: number) => string;
+  parseNum: (raw: string) => number;
+  onChange: (entries: FpsEntry[]) => void;
+  onAmountContextMenu: (e: React.MouseEvent, entryId: string) => void;
+  onEditEntryNote: (entryId: string) => void;
+  onRowContextMenu: (e: React.MouseEvent) => void;
+}) {
+  const updateEntry = (id: string, patch: Partial<FpsEntry>) => {
+    onChange(entries.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+  };
+
+  const removeEntry = (id: string) => {
+    onChange(entries.filter((e) => e.id !== id));
+  };
+
+  const addEntry = () => {
+    onChange([...entries, createEmptyFpsEntry()]);
+  };
+
+  return (
+    <td
+      className="ledger-td align-top"
+      colSpan={2}
+      onContextMenu={onRowContextMenu}
+    >
+      <div className="flex min-w-[14rem] flex-col gap-1.5 py-0.5">
+        {entries.length === 0 ? (
+          <p className="text-xs text-slate-400">尚無轉數快</p>
+        ) : (
+          entries.map((entry) => (
+            <div key={entry.id} className="flex items-start gap-1">
+              <select
+                value={entry.channel}
+                onChange={(e) =>
+                  updateEntry(entry.id, {
+                    channel: e.target.value as FpsChannel,
+                  })
+                }
+                className="ledger-input min-w-0 flex-1 cursor-pointer text-sm"
+              >
+                {FPS_CHANNEL_OPTIONS.map((opt) => (
+                  <option key={opt.value || "empty"} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <div className="min-w-[5.5rem] flex-1">
+                <NotableAmountCell
+                  variant="inline"
+                  noteKey="fpsAmount"
+                  note={entry.note}
+                  showAllNotes={showAllNotes}
+                  value={entry.amount}
+                  disabled={!entry.channel}
+                  placeholder={entry.channel ? "0" : "先選方式"}
+                  formatNum={formatNum}
+                  parseNum={parseNum}
+                  onValueChange={(amount) => updateEntry(entry.id, { amount })}
+                  onContextMenu={(e) => onAmountContextMenu(e, entry.id)}
+                  onEditNote={() => onEditEntryNote(entry.id)}
+                />
+              </div>
+              <button
+                type="button"
+                className="mt-1 shrink-0 rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100"
+                title="移除此筆轉數快"
+                onClick={() => removeEntry(entry.id)}
+              >
+                ×
+              </button>
+            </div>
+          ))
+        )}
+        <button
+          type="button"
+          className="self-start rounded-md border border-dashed border-slate-300 px-2 py-0.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50"
+          onClick={addEntry}
+        >
+          ＋ 轉數快
+        </button>
+      </div>
+    </td>
   );
 }
 

@@ -33,12 +33,11 @@ test.describe("登入 → 日結一列 → 月結數字一致", () => {
             fuel,
             water: 0,
             urea: 0,
-            fpsChannel: "",
-            fpsAmount: 0,
+            fpsEntries: [],
             bankDeposited: 0,
             bankPending: 0,
             cancelled: 0,
-            expenses,
+            expenseEntries: [{ id: "e2e-ex", label: "", amount: expenses }],
             notes: {},
           },
         ]),
@@ -71,17 +70,19 @@ test.describe("登入 → 日結一列 → 月結數字一致", () => {
           r.fuel = 0;
           r.water = 0;
           r.urea = 0;
-          r.fpsAmount = 0;
-          r.fpsChannel = "";
+          r.fpsEntries = [];
           r.bankDeposited = 0;
           r.bankPending = 0;
           r.cancelled = 0;
-          r.expenses = 0;
+          r.expenseEntries = [];
         }
         const target = entry.rows.find((r) => r.date === day1);
         if (target) {
           target.fuel = fuel;
-          target.expenses = expenses;
+          target.expenseEntries = [
+            { id: "e2e-ex", label: "", amount: expenses },
+          ];
+          delete target.expenses;
         }
         localStorage.setItem(storageKey, JSON.stringify(all));
       },
@@ -98,6 +99,10 @@ test.describe("登入 → 日結一列 → 月結數字一致", () => {
     await fuelInput.fill(String(fuel));
     await fuelInput.blur();
 
+    await page
+      .locator(`[data-ledger-date="${day1}"]`)
+      .getByRole("button", { name: "＋ 支出" })
+      .click();
     const expenseInput = page.locator(
       `[data-ledger-date="${day1}"] input[data-ledger-field="expenses"]`,
     );

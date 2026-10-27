@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 const FEATURES = [
-  "日結表即時加總與雲端同步",
+  "日結表即時加總與 Supabase 備份",
   "月結摘要、年度趨勢與備份",
   "多裝置登入，主題跟著帳號走",
 ];

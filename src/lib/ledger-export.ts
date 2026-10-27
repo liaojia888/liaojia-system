@@ -1,5 +1,9 @@
 import {
+  formatExpenseEntriesSummary,
+  formatFpsEntriesSummary,
   LEDGER_NOTE_LABELS,
+  totalExpenseOutflow,
+  totalFpsOutflow,
   type DailyLedgerComputed,
   type DailyLedgerRow,
   type LedgerNoteKey,
@@ -23,12 +27,13 @@ export function buildMonthCsv(
     "水",
     "尿素",
     "品項小計",
-    "轉數快方式",
-    "轉數快金額",
+    "轉數快明細",
+    "轉數快合計",
     "已入銀行",
     "待入銀行",
     "撤單",
-    "支出",
+    "支出明細",
+    "支出合計",
     "尾數",
     "備註摘要",
   ];
@@ -40,6 +45,17 @@ export function buildMonthCsv(
     const noteParts = (Object.keys(row.notes ?? {}) as LedgerNoteKey[])
       .filter((k) => row.notes?.[k]?.trim())
       .map((k) => `${LEDGER_NOTE_LABELS[k]}:${row.notes![k]!.trim()}`);
+    for (const entry of row.fpsEntries) {
+      if (entry.note?.trim()) {
+        noteParts.push(`轉數快:${entry.note.trim()}`);
+      }
+    }
+    for (const entry of row.expenseEntries) {
+      if (entry.note?.trim()) {
+        const head = entry.label.trim() || "支出";
+        noteParts.push(`${head}:${entry.note.trim()}`);
+      }
+    }
 
     return [
       row.date,
@@ -47,12 +63,13 @@ export function buildMonthCsv(
       row.water,
       row.urea,
       c?.productSubtotal ?? 0,
-      row.fpsChannel || "",
-      row.fpsAmount,
+      formatFpsEntriesSummary(row.fpsEntries),
+      totalFpsOutflow(row.fpsEntries),
       row.bankDeposited,
       row.bankPending,
       row.cancelled,
-      row.expenses,
+      formatExpenseEntriesSummary(row.expenseEntries),
+      totalExpenseOutflow(row.expenseEntries),
       c?.balance ?? 0,
       noteParts.join(" | "),
     ]

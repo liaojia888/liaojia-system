@@ -1,7 +1,10 @@
 import {
   computeRows,
   computeTotals,
+  rowHasAnyNotes,
   sortRowsByDate,
+  totalExpenseOutflow,
+  totalFpsOutflow,
   type DailyLedgerRow,
   type DailyLedgerTotals,
 } from "@/lib/daily-ledger";
@@ -33,12 +36,12 @@ export function summarizeRows(rows: DailyLedgerRow[]): {
       r.fuel ||
       r.water ||
       r.urea ||
-      r.fpsAmount ||
+      totalFpsOutflow(r.fpsEntries) > 0 ||
       r.bankDeposited ||
       r.bankPending ||
       r.cancelled ||
-      r.expenses ||
-      Object.keys(r.notes ?? {}).length > 0,
+      totalExpenseOutflow(r.expenseEntries) > 0 ||
+      rowHasAnyNotes(r),
   );
   return { totals, hasAnyData };
 }

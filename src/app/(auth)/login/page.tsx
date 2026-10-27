@@ -18,7 +18,7 @@ export default async function LoginPage({
   return (
     <AuthPageShell
       title="登入，開始對帳"
-      description="同一帳號可在公司電腦、手機與 Vercel 線上版使用；日結資料可同步雲端。"
+      description="同一帳號可在公司電腦、手機與線上版使用；日結可存本機並寫入 Supabase 資料庫。"
     >
       {params.reset === "1" ? (
         <AuthAlert variant="success">已清除本機登入 Cookie，請重新登入。</AuthAlert>
