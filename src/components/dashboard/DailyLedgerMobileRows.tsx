@@ -99,7 +99,7 @@ export function DailyLedgerMobileRows({
               />
             ))}
             <div className="col-span-2 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2.5 sm:col-span-3">
-              <span className="text-xs font-medium text-slate-600">品項小計</span>
+              <span className="text-xs font-medium text-slate-600">總收入</span>
               <span className="text-sm font-semibold tabular-nums text-slate-900">
                 {formatNum(row.productSubtotal) || "—"}
               </span>
@@ -315,7 +315,7 @@ export function DailyLedgerMobileRows({
           <TotalItem label="油" value={formatNum(totals.fuel)} />
           <TotalItem label="水" value={formatNum(totals.water)} />
           <TotalItem label="尿素" value={formatNum(totals.urea)} />
-          <TotalItem label="品項小計" value={formatNum(totals.productSubtotal)} />
+          <TotalItem label="總收入" value={formatNum(totals.productSubtotal)} />
           <TotalItem label="已入銀行" value={formatNum(totals.bankDeposited)} />
           <TotalItem label="待入銀行" value={formatNum(totals.bankPending)} />
           <TotalItem label="撤單" value={formatNum(totals.cancelled)} />

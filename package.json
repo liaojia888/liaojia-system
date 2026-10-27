@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node --max-http-header-size=65536 ./node_modules/next/dist/bin/next dev --webpack",
+    "dev": "node scripts/free-dev-ports.mjs && node --max-http-header-size=65536 ./node_modules/next/dist/bin/next dev --webpack -p 3000",
+    "dev:stop": "node scripts/free-dev-ports.mjs",
+    "dev:check": "node scripts/check-dev-ports.mjs",
     "build": "next build --webpack",
     "start": "node --max-http-header-size=65536 ./node_modules/next/dist/bin/next start",
     "lint": "eslint",

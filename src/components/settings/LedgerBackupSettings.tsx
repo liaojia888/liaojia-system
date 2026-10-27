@@ -14,6 +14,7 @@ import {
   type DailyLedgerRow,
 } from "@/lib/daily-ledger";
 import {
+  clearAllLocalLedgerMonths,
   loadAllLocalMonths,
   replaceAllLocalMonths,
 } from "@/lib/ledger-local-store";
@@ -166,6 +167,29 @@ export function LedgerBackupSettings() {
     });
   }
 
+  function clearLocalLedgerCache() {
+    const count = Object.keys(loadAllLocalMonths()).length;
+    if (count === 0) {
+      setError(null);
+      setMessage("本機日結快取已是空的。");
+      return;
+    }
+    const ok = confirm(
+      `確定要清除本機 ${count} 個月份的日結快取？\n\n` +
+        "Supabase 資料庫不會刪除。清除後日結表會顯示空白月模板；若雲端有備份，請到日結表手動「合併 Supabase 資料」或從 JSON 還原。",
+    );
+    if (!ok) return;
+
+    setError(null);
+    setMessage(null);
+    const cleared = clearAllLocalLedgerMonths();
+    setMessage(
+      cleared > 0
+        ? `已清除本機 ${cleared} 個月份的日結快取。若日結表已開啟，請切換月份或重新整理以更新畫面。`
+        : "本機日結快取已是空的。",
+    );
+  }
+
   function onImportFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -255,6 +279,20 @@ export function LedgerBackupSettings() {
             onChange={onImportFile}
           />
         </label>
+      </div>
+      <div className="mt-6 border-t border-slate-200 pt-5">
+        <h3 className="text-base font-semibold text-slate-900">本機快取</h3>
+        <p className="mt-1 text-sm text-slate-600">
+          僅刪除此 Chrome 設定檔內的日結 localStorage，不影響 Supabase。開發時若畫面與登入帳號混亂，可先備份 JSON 再清除。
+        </p>
+        <button
+          type="button"
+          onClick={clearLocalLedgerCache}
+          disabled={pending}
+          className="ledger-touch-btn mt-3 rounded-full border border-red-300 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-900 hover:bg-red-100"
+        >
+          清除本機日結快取
+        </button>
       </div>
       <div className="mt-6 border-t border-slate-200 pt-5">
         <h3 className="text-base font-semibold text-slate-900">

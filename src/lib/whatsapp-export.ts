@@ -99,7 +99,7 @@ export function formatLedgerRowForWhatsApp(
     `油收入：${money(row.fuel)}`,
     `水收入：${money(row.water)}`,
     `尿素收入：${money(row.urea)}`,
-    `品項小計：${money(row.productSubtotal)}`,
+    `總收入：${money(row.productSubtotal)}`,
     "",
     formatFpsBlock(row),
     `已入銀行（公司）：${money(row.bankDeposited)}`,

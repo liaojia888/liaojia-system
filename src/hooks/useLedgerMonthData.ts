@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import {
   saveLedgerMonth,
   type LedgerMonthPayload,
@@ -42,12 +49,35 @@ export function useLedgerMonthData({
   month: number;
   organizationId: string | null;
 }) {
-  const [rows, setRows] = useState(() =>
-    rowsForMonthKey(monthKey, year, month),
+  /** 首屏與 SSR 一致（空白月模板）；掛載後再讀 localStorage，避免 hydration 錯誤 */
+  const [rows, setRowsState] = useState(() =>
+    defaultRowsForMonth(year, month),
   );
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
-  const [ready, setReady] = useState(true);
+
+  const writeLocalRows = useCallback(
+    (next: DailyLedgerRow[]) => {
+      const sorted = sortRowsByDate(next);
+      saveLocalMonth(monthKey, sorted);
+      rowsRef.current = sorted;
+      return sorted;
+    },
+    [monthKey],
+  );
+
+  /** 任一欄位（含轉數快／銀行／支出）變更後立刻寫入 localStorage */
+  const setRows: Dispatch<SetStateAction<DailyLedgerRow[]>> = useCallback(
+    (action) => {
+      setRowsState((prev) => {
+        const next =
+          typeof action === "function" ? action(prev) : action;
+        return writeLocalRows(next);
+      });
+    },
+    [writeLocalRows],
+  );
+  const [ready, setReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState<LedgerSyncStatus>("local_saved");
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [cloudConflict, setCloudConflict] = useState<LedgerMonthPayload | null>(
@@ -79,11 +109,16 @@ export function useLedgerMonthData({
   const reloadFromLocalCache = useCallback(() => {
     if (shareLockRef.current || cloudDirtyRef.current) return;
     const local = loadLocalMonth(monthKey);
-    if (!local?.length) return;
+    if (!local?.length) {
+      const blank = defaultRowsForMonth(year, month);
+      rowsRef.current = blank;
+      setRowsState(blank);
+      return;
+    }
     setRows((prev) =>
       mergeMonthRowsPreferRicher(prev, sortRowsByDate(local)),
     );
-  }, [monthKey]);
+  }, [monthKey, year, month]);
 
   const reloadMonth = useCallback(() => {
     const local = loadLocalMonth(monthKey);
@@ -97,7 +132,10 @@ export function useLedgerMonthData({
 
   /** 切換月份：只讀本機，不連 Supabase */
   useEffect(() => {
-    setRows(rowsForMonthKey(monthKey, year, month));
+    const loaded = rowsForMonthKey(monthKey, year, month);
+    rowsRef.current = loaded;
+    setRowsState(loaded);
+    setReady(true);
     remoteUpdatedAtRef.current = null;
     skipCloudDirtyOnceRef.current = true;
     markCloudClean();
@@ -115,16 +153,15 @@ export function useLedgerMonthData({
 
   useEffect(() => {
     return subscribeLedgerSync((msg) => {
-      if (msg.monthKey !== monthKey) return;
+      if (msg.monthKey !== monthKey && msg.monthKey !== "*") return;
       reloadFromLocalCache();
     });
   }, [monthKey, reloadFromLocalCache]);
 
-  /** 編輯 → 只寫瀏覽器本機，不寫 Supabase */
+  /** 編輯後更新 Supabase 同步狀態（本機已在 setRows 當下寫入） */
   useEffect(() => {
     if (!ready || rows.length === 0) return;
 
-    saveLocalMonth(monthKey, rows);
     if (!organizationId) {
       setSyncStatus("local_only");
       return;
@@ -144,7 +181,6 @@ export function useLedgerMonthData({
     const remoteRows = sortRowsByDate(cloudConflict.rows);
     const next = mergeMonthRowsPreferRicher(rowsRef.current, remoteRows);
     remoteUpdatedAtRef.current = cloudConflict.updatedAt;
-    saveLocalMonth(monthKey, next);
     setRows(next);
     setCloudConflict(null);
     markCloudClean();

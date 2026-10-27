@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import {
   computeRows,
@@ -33,7 +34,6 @@ import {
   weChatShareSuccessMessage,
 } from "@/lib/whatsapp-export";
 import { DailyLedgerMobileRows } from "@/components/dashboard/DailyLedgerMobileRows";
-import { LogoutButton } from "@/components/layout/LogoutButton";
 import { useLedgerMonthData } from "@/hooks/useLedgerMonthData";
 import { buildMonthCsv, downloadTextFile } from "@/lib/ledger-export";
 
@@ -305,12 +305,30 @@ export function DailyLedgerSheet({
     }
   }
 
+  const saveSupabaseControl = organizationId ? (
+    <button
+      type="button"
+      onClick={() => void handleSaveToCloud()}
+      disabled={isSavingCloud}
+      className="ledger-touch-btn ledger-btn-primary h-11 w-full rounded-xl px-4 text-sm font-semibold shadow-sm"
+    >
+      {isSavingCloud ? "寫入 Supabase…" : "儲存至 Supabase"}
+    </button>
+  ) : (
+    <Link
+      href="/settings"
+      className="ledger-touch-btn ledger-btn-primary inline-flex h-11 w-full items-center justify-center rounded-xl px-4 text-sm font-semibold shadow-sm"
+    >
+      至設定建立公司
+    </Link>
+  );
+
   function exportCsv() {
     const csv = buildMonthCsv(key, sortRowsByDate(rows), computed);
     downloadTextFile(`日結-${key}.csv`, csv, "text/csv;charset=utf-8");
   }
 
-  if (!ready && rows.length === 0) {
+  if (!ready) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
         載入日結表…
@@ -320,9 +338,9 @@ export function DailyLedgerSheet({
 
   return (
     <div className="ledger-workspace flex min-h-0 flex-1 flex-col">
-      <header className="ledger-hero rounded-b-2xl px-3 py-4 sm:px-5 sm:py-5 lg:px-8 lg:py-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0">
+      <header className="ledger-hero rounded-b-2xl px-4 py-5 sm:px-6 lg:px-8 lg:py-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex-1">
             <p className="ledger-hero-kicker text-[10px] font-bold uppercase tracking-[0.25em] sm:text-xs">
               Daily Ledger
             </p>
@@ -332,76 +350,84 @@ export function DailyLedgerSheet({
             <p className="mt-0.5 text-sm font-medium text-slate-600">
               營收對帳表
             </p>
-            <p className="mt-1 max-w-2xl text-xs text-slate-600 sm:text-sm">
-              <span className="lg:hidden">
-                手機／平板：每列「列操作」或「＋備註」；電腦可右鍵操作。
-              </span>
-              <span className="hidden lg:inline">
-                右鍵可新增／移除列、備註與清空該列；轉數快／支出每筆金額旁可按「＋備註」。
-              </span>
-              {organizationId ? (
-                <span className="mt-1 block text-[var(--theme-accent-strong)]">
-                  不會自動連 Supabase；編輯只存本機，要備份到資料庫請按「儲存至 Supabase」。
-                </span>
-              ) : null}
-            </p>
-            {syncLabel ? (
-              <p className="mt-2 text-xs font-medium text-[var(--theme-accent-strong)]">
-                {syncLabel}
-                {syncMessage ? ` · ${syncMessage}` : null}
-              </p>
-            ) : null}
           </div>
-          <div className="flex flex-wrap gap-2">
-            {organizationId ? (
-              <button
-                type="button"
-                onClick={() => void handleSaveToCloud()}
-                disabled={isSavingCloud}
-                className={`ledger-touch-btn rounded-full px-4 py-2.5 text-sm font-medium shadow-sm sm:py-2 ${
-                  cloudDirty ? "ledger-btn-primary" : "ledger-btn-ghost"
-                }`}
-              >
-                {isSavingCloud ? "寫入中…" : "儲存至 Supabase"}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={exportCsv}
-              className="ledger-touch-btn ledger-btn-ghost rounded-full px-4 py-2.5 text-sm font-medium shadow-sm sm:py-2"
-            >
-              匯出 CSV
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowAllNotes((v) => !v)}
-              className={`ledger-touch-btn rounded-full px-4 py-2.5 text-sm font-medium shadow-sm transition sm:py-2 ${
-                showAllNotes
-                  ? "border border-amber-300/80 bg-amber-50 text-amber-900"
-                  : "ledger-btn-ghost"
-              }`}
-            >
-              {showAllNotes ? "隱藏備註" : "顯示備註"}
-            </button>
+
+          <div
+            className="inline-flex shrink-0 self-start rounded-xl border border-slate-200/90 bg-white/90 p-1 shadow-sm"
+            role="group"
+            aria-label="切換月份"
+          >
             <button
               type="button"
               onClick={() => shiftMonth(-1)}
-              className="ledger-touch-btn ledger-btn-ghost rounded-full px-4 py-2.5 text-sm font-medium shadow-sm sm:py-2"
+              className="ledger-touch-btn rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
-              ← 上個月
+              上個月
             </button>
+            <span className="flex min-w-[5.5rem] items-center justify-center border-x border-slate-200/80 px-2 text-sm font-semibold tabular-nums text-slate-900">
+              {String(month).padStart(2, "0")}/{year}
+            </span>
             <button
               type="button"
               onClick={() => shiftMonth(1)}
-              className="ledger-touch-btn ledger-btn-ghost rounded-full px-4 py-2.5 text-sm font-medium shadow-sm sm:py-2"
+              className="ledger-touch-btn rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
-              下個月 →
+              下個月
             </button>
-            <LogoutButton
-              label="登出"
-              className="ledger-touch-btn ledger-btn-primary rounded-full px-4 py-2.5 text-sm font-medium shadow-sm sm:py-2"
-            />
           </div>
+        </div>
+
+        {(syncLabel || syncMessage) && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {syncLabel ? (
+              <span className="inline-flex items-center rounded-full border border-emerald-200/80 bg-white/95 px-3 py-1 text-xs font-medium text-emerald-900">
+                {syncLabel}
+              </span>
+            ) : null}
+            {syncMessage ? (
+              <span className="text-xs text-amber-800">{syncMessage}</span>
+            ) : null}
+          </div>
+        )}
+
+        <p className="mt-2 max-w-3xl text-xs leading-relaxed text-slate-500">
+          <span className="hidden lg:inline">
+            右鍵可管理列與備註；轉數快／支出每筆可「＋備註」。
+          </span>
+          <span className="lg:hidden">每列「列操作」或「＋備註」。</span>
+          {organizationId ? (
+            <span className="mt-1 block text-slate-600">
+              編輯即存本機；備份資料庫請按「儲存至 Supabase」。尾數自動計算。
+            </span>
+          ) : (
+            <span className="mt-1 block text-slate-600">
+              編輯即存本機；請至設定建立公司後可存 Supabase。
+            </span>
+          )}
+        </p>
+
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-stretch">
+          <div className="col-span-2 hidden min-w-[11rem] sm:block">
+            {saveSupabaseControl}
+          </div>
+          <button
+            type="button"
+            onClick={exportCsv}
+            className="ledger-touch-btn ledger-btn-ghost h-11 rounded-xl px-4 text-sm font-medium shadow-sm"
+          >
+            匯出 CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowAllNotes((v) => !v)}
+            className={`ledger-touch-btn h-11 rounded-xl px-4 text-sm font-medium shadow-sm ${
+              showAllNotes
+                ? "border border-amber-300/80 bg-amber-50 text-amber-900"
+                : "ledger-btn-ghost"
+            }`}
+          >
+            {showAllNotes ? "隱藏備註" : "顯示備註"}
+          </button>
         </div>
 
         {cloudConflict ? (
@@ -437,14 +463,14 @@ export function DailyLedgerSheet({
         ) : null}
 
         <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <SummaryChip label="總收入" value={totals.totalRevenue} accent />
+          <SummaryChip label="淨收入（扣撤單）" value={totals.totalRevenue} highlight />
           <SummaryChip label="總支出" value={totals.expenses} />
           <SummaryChip label="待入銀行合計" value={totals.bankPending} />
-          <SummaryChip label="期末尾數" value={totals.closingBalance} accent />
+          <SummaryChip label="期末尾數" value={totals.closingBalance} highlight />
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-auto p-3 sm:p-4 lg:p-6">
+      <div className="min-h-0 flex-1 overflow-auto p-3 pb-28 sm:p-4 sm:pb-6 lg:p-6">
         <div className="lg:hidden">
           <DailyLedgerMobileRows
             rows={computed}
@@ -479,7 +505,7 @@ export function DailyLedgerSheet({
                   收入明細
                 </th>
                 <th rowSpan={2} className="ledger-th ledger-th-accent min-w-[5.5rem]">
-                  品項小計
+                  總收入
                 </th>
                 <th colSpan={2} className="ledger-th">
                   轉數快（FPS）
@@ -681,6 +707,13 @@ export function DailyLedgerSheet({
           </div>
           </div>
         </div>
+      </div>
+
+      <div className="sticky bottom-0 z-30 shrink-0 border-t border-emerald-200/80 bg-white/95 px-3 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur-sm sm:hidden">
+        <p className="mb-2 text-center text-[11px] leading-snug text-slate-600">
+          欄位一改即存本機；備份到 Supabase 資料庫請按：
+        </p>
+        {saveSupabaseControl}
       </div>
 
       <LedgerNoteContextMenu
@@ -1015,24 +1048,24 @@ function FpsEntriesCell({
 function SummaryChip({
   label,
   value,
-  accent,
+  highlight,
 }: {
   label: string;
   value: number;
-  accent?: boolean;
+  highlight?: boolean;
 }) {
   return (
     <div
-      className={`rounded-2xl border px-4 py-3.5 shadow-sm backdrop-blur-sm ${
-        accent
-          ? "ledger-stat-accent"
-          : "border-white/60 bg-white/70"
+      className={`flex min-h-[4.5rem] flex-col justify-center rounded-xl border border-slate-200/90 bg-white/95 px-4 py-3 shadow-sm ${
+        highlight ? "border-l-4 border-l-emerald-600 pl-3" : ""
       }`}
     >
-      <p className="text-xs font-medium text-slate-600">{label}</p>
+      <p className="text-[11px] font-medium leading-tight text-slate-500 sm:text-xs">
+        {label}
+      </p>
       <p
-        className={`ledger-stat-value mt-1 text-xl font-semibold tabular-nums ${
-          accent ? "" : "text-slate-900"
+        className={`mt-1 text-lg font-semibold tabular-nums sm:text-xl ${
+          highlight ? "text-emerald-900" : "text-slate-900"
         }`}
       >
         {value.toLocaleString("zh-TW", {

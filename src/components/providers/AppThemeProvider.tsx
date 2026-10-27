@@ -53,7 +53,9 @@ export function AppThemeProvider({
 
     window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(() => {
-      void saveAppThemeAction(theme);
+      void saveAppThemeAction(theme).catch(() => {
+        /* 舊版 JS Action ID 失效時由 ServerActionSyncGuard 處理重新載入 */
+      });
     }, 400);
   }, [theme, ready]);
 

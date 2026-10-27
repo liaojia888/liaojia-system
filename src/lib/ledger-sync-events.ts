@@ -37,7 +37,11 @@ export function subscribeLedgerSync(
   bc?.addEventListener("message", handler);
 
   const onStorage = (event: StorageEvent) => {
-    if (event.key !== LEDGER_STORAGE_KEY || !event.newValue) return;
+    if (event.key !== LEDGER_STORAGE_KEY) return;
+    if (!event.newValue) {
+      onMessage({ type: "month-updated", monthKey: "*" });
+      return;
+    }
     try {
       const all = JSON.parse(event.newValue) as Record<
         string,

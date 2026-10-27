@@ -312,7 +312,7 @@ export function MonthlyLedgerReport({
 
         {view === "month" && hasAnyData ? (
           <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <SummaryStat label="總收入" value={money(totals.totalRevenue)} accent />
+            <SummaryStat label="淨收入（扣撤單）" value={money(totals.totalRevenue)} accent />
             <SummaryStat label="總支出" value={money(totals.expenses)} />
             <SummaryStat label="待入銀行" value={money(totals.bankPending)} />
             <SummaryStat label="期末尾數" value={money(totals.closingBalance)} accent />
@@ -496,9 +496,9 @@ function MonthReportBody({
           <Row label="油收入" value={money(totals.fuel)} />
           <Row label="水收入" value={money(totals.water)} />
           <Row label="尿素收入" value={money(totals.urea)} />
-          <Row label="品項小計" value={money(totals.productSubtotal)} strong />
+          <Row label="總收入" value={money(totals.productSubtotal)} strong />
           <Row label="撤單（扣減）" value={money(totals.cancelled)} />
-          <Row label="總收入" value={money(totals.totalRevenue)} strong accent />
+          <Row label="淨收入（扣撤單）" value={money(totals.totalRevenue)} strong accent />
         </ReportBlock>
         <ReportBlock title="收款與支出">
           <Row label="轉數快 · 公司" value={money(totals.fpsCompany)} />

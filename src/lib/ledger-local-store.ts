@@ -12,7 +12,12 @@ type StoredLedger = {
   clientSavedAt?: string;
 };
 
+function canUseLocalStorage(): boolean {
+  return typeof window !== "undefined" && typeof localStorage !== "undefined";
+}
+
 export function loadLocalMonth(monthKey: string): DailyLedgerRow[] | null {
+  if (!canUseLocalStorage()) return null;
   try {
     const raw = localStorage.getItem(LEDGER_STORAGE_KEY);
     if (!raw) return null;
@@ -25,6 +30,7 @@ export function loadLocalMonth(monthKey: string): DailyLedgerRow[] | null {
 }
 
 export function saveLocalMonth(monthKey: string, rows: DailyLedgerRow[]) {
+  if (!canUseLocalStorage()) return;
   try {
     const raw = localStorage.getItem(LEDGER_STORAGE_KEY);
     const all = raw ? (JSON.parse(raw) as Record<string, StoredLedger>) : {};
@@ -40,6 +46,7 @@ export function saveLocalMonth(monthKey: string, rows: DailyLedgerRow[]) {
 }
 
 export function loadLocalClientSavedAt(monthKey: string): string | null {
+  if (!canUseLocalStorage()) return null;
   try {
     const raw = localStorage.getItem(LEDGER_STORAGE_KEY);
     if (!raw) return null;
@@ -51,6 +58,7 @@ export function loadLocalClientSavedAt(monthKey: string): string | null {
 }
 
 export function loadAllLocalMonths(): Record<string, DailyLedgerRow[]> {
+  if (!canUseLocalStorage()) return {};
   try {
     const raw = localStorage.getItem(LEDGER_STORAGE_KEY);
     if (!raw) return {};
@@ -70,6 +78,7 @@ export function loadAllLocalMonths(): Record<string, DailyLedgerRow[]> {
 }
 
 export function replaceAllLocalMonths(all: Record<string, DailyLedgerRow[]>) {
+  if (!canUseLocalStorage()) return;
   try {
     const wrapped: Record<string, StoredLedger> = {};
     for (const [monthKey, rows] of Object.entries(all)) {
@@ -82,4 +91,19 @@ export function replaceAllLocalMonths(all: Record<string, DailyLedgerRow[]>) {
   } catch {
     // ignore
   }
+}
+
+/** 刪除瀏覽器內所有月份日結快取（不影響 Supabase）。回傳已清除的月份數。 */
+export function clearAllLocalLedgerMonths(): number {
+  if (!canUseLocalStorage()) return 0;
+  const keys = Object.keys(loadAllLocalMonths());
+  try {
+    localStorage.removeItem(LEDGER_STORAGE_KEY);
+  } catch {
+    return 0;
+  }
+  for (const monthKey of keys) {
+    broadcastLedgerMonthUpdated(monthKey);
+  }
+  return keys.length;
 }
