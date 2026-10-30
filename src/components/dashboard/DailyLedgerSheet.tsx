@@ -12,6 +12,7 @@ import {
   FPS_CHANNEL_OPTIONS,
   isLedgerRowActive,
   type DailyLedgerRow,
+  type DailyLedgerTotals,
   type ExpenseEntry,
   type FpsChannel,
   type FpsEntry,
@@ -908,55 +909,75 @@ export function DailyLedgerSheet({
               ))}
             </tbody>
             <tfoot>
-              <tr className="bg-slate-100 font-semibold text-slate-900">
-                <td className="ledger-td ledger-sticky-col sticky left-0 z-10 bg-slate-100">
+              <tr className="ledger-tfoot-row font-semibold text-slate-900">
+                <td className="ledger-td ledger-tfoot-cell ledger-sticky-col sticky left-0 z-10">
                   總計
                 </td>
-                <td className="ledger-td text-right tabular-nums">
+                <td className="ledger-td ledger-tfoot-cell ledger-tfoot-num">
                   {formatNum(totals.fuel)}
                 </td>
-                <td className="ledger-td text-right tabular-nums">
+                <td className="ledger-td ledger-tfoot-cell ledger-tfoot-num">
                   {formatNum(totals.water)}
                 </td>
-                <td className="ledger-td text-right tabular-nums">
+                <td className="ledger-td ledger-tfoot-cell ledger-tfoot-num">
                   {formatNum(totals.urea)}
                 </td>
-                <td className="ledger-td text-right tabular-nums">
+                <td className="ledger-td ledger-tfoot-cell ledger-tfoot-num ledger-tfoot-accent">
                   {formatNum(totals.productSubtotal)}
                 </td>
                 {isMobileSpreadsheet ? (
-                  <td className="ledger-td text-xs leading-relaxed text-slate-700">
-                    轉數快 公司 {formatNum(totals.fpsCompany)} · 私人{" "}
-                    {formatNum(totals.fpsPrivate)} · Alipay{" "}
-                    {formatNum(totals.fpsAlipay)}
-                    <br />
-                    已入 {formatNum(totals.bankDeposited)} · 待入{" "}
-                    {formatNum(totals.bankPending)} · 撤單{" "}
-                    {formatNum(totals.cancelled)} · 其他支出{" "}
-                    {formatNum(totals.expenses)}
+                  <td className="ledger-td ledger-tfoot-cell align-top">
+                    <p className="ledger-tfoot-section-title">轉數快小計</p>
+                    <FpsTotalsFooter totals={totals} formatNum={formatNum} />
+                    <p className="ledger-tfoot-section-title mt-2 border-t border-slate-300/70 pt-2">
+                      出帳小計
+                    </p>
+                    <div className="ledger-outflow-totals">
+                      {(
+                        [
+                          ["已入銀行", totals.bankDeposited],
+                          ["待入銀行", totals.bankPending],
+                          ["撤單", totals.cancelled],
+                          ["其他支出", totals.expenses],
+                        ] as const
+                      ).map(([label, value]) => (
+                        <div key={label} className="ledger-outflow-totals-row">
+                          <span className="font-semibold text-slate-600">
+                            {label}
+                          </span>
+                          <span className="tabular-nums font-bold text-slate-900">
+                            {formatNum(value) || "0"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </td>
                 ) : (
                   <>
-                    <td className="ledger-td text-right tabular-nums" colSpan={2}>
-                      公司 {formatNum(totals.fpsCompany)} · 私人{" "}
-                      {formatNum(totals.fpsPrivate)} · Alipay{" "}
-                      {formatNum(totals.fpsAlipay)}
+                    <td
+                      colSpan={2}
+                      className="ledger-td ledger-tfoot-cell ledger-tfoot-fps align-top"
+                    >
+                      <FpsTotalsFooter
+                        totals={totals}
+                        formatNum={formatNum}
+                      />
                     </td>
-                    <td className="ledger-td text-right tabular-nums">
+                    <td className="ledger-td ledger-tfoot-cell ledger-tfoot-num">
                       {formatNum(totals.bankDeposited)}
                     </td>
-                    <td className="ledger-td text-right tabular-nums">
+                    <td className="ledger-td ledger-tfoot-cell ledger-tfoot-num">
                       {formatNum(totals.bankPending)}
                     </td>
-                    <td className="ledger-td text-right tabular-nums">
+                    <td className="ledger-td ledger-tfoot-cell ledger-tfoot-num">
                       {formatNum(totals.cancelled)}
                     </td>
-                    <td className="ledger-td text-right tabular-nums align-top">
+                    <td className="ledger-td ledger-tfoot-cell ledger-tfoot-num">
                       {formatNum(totals.expenses)}
                     </td>
                   </>
                 )}
-                <td className="ledger-td text-right tabular-nums text-emerald-800">
+                <td className="ledger-td ledger-tfoot-cell ledger-tfoot-num ledger-tfoot-accent text-emerald-900">
                   {formatNum(totals.closingBalance)}
                 </td>
               </tr>
@@ -1310,6 +1331,42 @@ function FpsEntriesCell({
         </button>
       </div>
     </td>
+  );
+}
+
+const FPS_TOTAL_LINES = [
+  { key: "company", label: "公司" },
+  { key: "private", label: "私人" },
+  { key: "alipay", label: "Alipay" },
+] as const;
+
+function fpsTotalAmount(
+  totals: DailyLedgerTotals,
+  key: (typeof FPS_TOTAL_LINES)[number]["key"],
+): number {
+  if (key === "company") return totals.fpsCompany;
+  if (key === "private") return totals.fpsPrivate;
+  return totals.fpsAlipay;
+}
+
+function FpsTotalsFooter({
+  totals,
+  formatNum,
+}: {
+  totals: DailyLedgerTotals;
+  formatNum: (n: number) => string;
+}) {
+  return (
+    <div className="ledger-fps-total-entry-wrap">
+      {FPS_TOTAL_LINES.map(({ key, label }) => (
+        <div key={key} className="ledger-fps-total-entry-line">
+          <span className="ledger-fps-total-entry-channel">{label}</span>
+          <span className="ledger-fps-total-entry-amount">
+            {formatNum(fpsTotalAmount(totals, key)) || "0"}
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }
 
