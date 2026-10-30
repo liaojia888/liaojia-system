@@ -20,6 +20,8 @@ export function WorkResourceMobileRows({
   parseNum,
   updateRow,
   updateCount,
+  openRowMenu,
+  onNoteContextMenu,
 }: {
   rows: WorkResourceComputedRow[];
   totals: WorkResourceMonthTotals;
@@ -31,6 +33,8 @@ export function WorkResourceMobileRows({
     category: WorkResourceCategoryKey,
     value: number,
   ) => void;
+  openRowMenu: (rowId: string, anchor: HTMLElement) => void;
+  onNoteContextMenu: (e: React.MouseEvent, rowId: string) => void;
 }) {
   return (
     <div className="space-y-3 pb-4">
@@ -39,12 +43,21 @@ export function WorkResourceMobileRows({
           key={row.id}
           className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4"
         >
-          <input
-            type="date"
-            value={row.date}
-            onChange={(e) => updateRow(row.id, { date: e.target.value })}
-            className="ledger-touch-input w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
-          />
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={row.date}
+              onChange={(e) => updateRow(row.id, { date: e.target.value })}
+              className="ledger-touch-input min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
+            />
+            <button
+              type="button"
+              className="ledger-touch-btn shrink-0 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-800"
+              onClick={(e) => openRowMenu(row.id, e.currentTarget)}
+            >
+              列操作
+            </button>
+          </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2.5">
             {WORK_RESOURCE_CATEGORIES.map(({ key, label, sign }) => (
@@ -72,19 +85,13 @@ export function WorkResourceMobileRows({
             ))}
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <div className="rounded-lg bg-slate-100 px-3 py-2.5">
-              <p className="text-[11px] font-medium text-slate-600">當日淨值</p>
-              <p className="mt-0.5 text-lg font-semibold tabular-nums text-slate-900">
-                {formatSigned(row.dailyNet)}
-              </p>
-            </div>
-            <div className="rounded-lg border border-emerald-200/90 bg-emerald-50/90 px-3 py-2.5">
-              <p className="text-[11px] font-medium text-emerald-800/90">本月累計</p>
-              <p className="mt-0.5 text-lg font-bold tabular-nums text-emerald-900">
-                {formatSigned(row.cumulative)}
-              </p>
-            </div>
+          <div className="mt-3 rounded-lg border border-emerald-200/90 bg-emerald-50/90 px-3 py-2.5">
+            <p className="text-[11px] font-medium text-emerald-800/90">
+              當日用量（大+細−槍−漏）
+            </p>
+            <p className="mt-0.5 text-lg font-bold tabular-nums text-emerald-900">
+              {formatSigned(row.dailyNet)}
+            </p>
           </div>
 
           <label className="mt-3 block">
@@ -92,8 +99,9 @@ export function WorkResourceMobileRows({
             <textarea
               value={row.note}
               rows={2}
-              placeholder="選填"
+              placeholder="選填（長按可開備註選單）"
               onChange={(e) => updateRow(row.id, { note: e.target.value })}
+              onContextMenu={(e) => onNoteContextMenu(e, row.id)}
               className="ledger-touch-input mt-1 w-full resize-y rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
             />
           </label>
@@ -113,15 +121,9 @@ export function WorkResourceMobileRows({
           ))}
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3">
-          <span className="text-xs text-slate-600">淨值加總</span>
-          <span className="text-base font-semibold tabular-nums">
-            {formatSigned(totals.totalDailyNet)}
-          </span>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs font-medium text-emerald-800">期末累計</span>
+          <span className="text-xs font-medium text-emerald-800">本月用量加總</span>
           <span className="text-xl font-bold tabular-nums text-emerald-900">
-            {formatSigned(totals.closingCumulative)}
+            {formatSigned(totals.totalDailyNet)}
           </span>
         </div>
       </article>

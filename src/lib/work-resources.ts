@@ -20,10 +20,8 @@ export type WorkResourceRow = {
 };
 
 export type WorkResourceComputedRow = WorkResourceRow & {
-  /** 當日：大機 + 細機 − 試槍 − 漏油 */
+  /** 當日用量／淨值：大機 + 細機 − 試槍 − 漏油 */
   dailyNet: number;
-  /** 自月初逐日累加 dailyNet */
-  cumulative: number;
 };
 
 export type WorkResourceMonthTotals = WorkResourceCounts & {
@@ -134,12 +132,10 @@ export function workResourceRowHasData(row: WorkResourceRow): boolean {
 export function computeWorkResourceRows(
   rows: WorkResourceRow[],
 ): WorkResourceComputedRow[] {
-  let cumulative = 0;
-  return sortWorkResourceRows(rows).map((row) => {
-    const dailyNet = workResourceDailyNet(row);
-    cumulative += dailyNet;
-    return { ...row, dailyNet, cumulative };
-  });
+  return sortWorkResourceRows(rows).map((row) => ({
+    ...row,
+    dailyNet: workResourceDailyNet(row),
+  }));
 }
 
 export function computeWorkResourceMonthTotals(
@@ -152,12 +148,11 @@ export function computeWorkResourceMonthTotals(
     }
   }
   const totalDailyNet = computed.reduce((s, r) => s + r.dailyNet, 0);
-  const closingCumulative =
-    computed.length > 0 ? computed[computed.length - 1].cumulative : 0;
   return {
     ...base,
     totalDailyNet,
-    closingCumulative,
+    /** 本月各日用量加總（同 totalDailyNet） */
+    closingCumulative: totalDailyNet,
   };
 }
 

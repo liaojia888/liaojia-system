@@ -8,6 +8,12 @@ import {
   type DailyLedgerComputed,
   type DailyLedgerTotals,
 } from "@/lib/daily-ledger";
+import {
+  WORK_RESOURCE_CATEGORIES,
+  workResourceRowHasData,
+  type WorkResourceComputedRow,
+  type WorkResourceMonthTotals,
+} from "@/lib/work-resources";
 
 function money(n: number): string {
   return n.toLocaleString("zh-TW", { maximumFractionDigits: 0 });
@@ -225,5 +231,64 @@ export async function shareViaWeChat(text: string): Promise<WeChatShareResult> {
 export function weChatShareSuccessMessage(
   _mode?: WeChatShareResult["mode"],
 ): string {
-  return "日結文字已複製（與 WhatsApp 相同格式）。請開啟微信 → 選聊天 → 長按輸入框貼上。";
+  return "文字已複製（與 WhatsApp 相同格式）。請開啟微信 → 選聊天 → 長按輸入框貼上。";
+}
+
+export function formatWorkResourceRowForWhatsApp(
+  row: WorkResourceComputedRow,
+  companyName: string,
+): string {
+  const lines = WORK_RESOURCE_CATEGORIES.map(
+    ({ key, label }) => `${label}：${money(row.counts[key])}`,
+  );
+  const noteBlock = row.note.trim()
+    ? `\n備註：${row.note.trim()}`
+    : "";
+  return [
+    `【資源進出】${companyName}`,
+    `日期：${formatDateZh(row.date)}`,
+    "",
+    ...lines,
+    "",
+    `當日用量：${money(row.dailyNet)}（大機+細機−試槍−漏油）`,
+    noteBlock,
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+}
+
+export function formatWorkResourceMonthForWhatsApp(
+  rows: WorkResourceComputedRow[],
+  totals: WorkResourceMonthTotals,
+  year: number,
+  month: number,
+  companyName: string,
+): string {
+  const activeRows = rows.filter(workResourceRowHasData);
+  const rowBlocks =
+    activeRows.length === 0
+      ? "（本月尚無填寫資料）"
+      : activeRows
+          .map((row) => {
+            const parts = WORK_RESOURCE_CATEGORIES.map(
+              ({ key, label }) => `${label}${money(row.counts[key])}`,
+            ).join(" ");
+            return `▸ ${formatDateZh(row.date)} ${parts} | 用量${money(row.dailyNet)}`;
+          })
+          .join("\n");
+
+  const catTotals = WORK_RESOURCE_CATEGORIES.map(
+    ({ key, label }) => `${label}：${money(totals[key])}`,
+  ).join(" | ");
+
+  return [
+    `【${year}年${month}月 資源進出摘要】${companyName}`,
+    "",
+    rowBlocks,
+    "",
+    "— 本月合計 —",
+    catTotals,
+    `本月用量加總：${money(totals.totalDailyNet)}`,
+  ].join("\n");
 }

@@ -12,10 +12,13 @@ export type NoteTarget = {
   expenseEntryId?: string;
 };
 
+/** 日結儲存格備註；資源表列備註用 rowNote */
+export type SheetContextNoteKey = LedgerNoteKey | "rowNote";
+
 export type ContextMenuState = {
   rowId: string;
-  /** 金額格右鍵時帶入；日期格右鍵僅清空這行則可省略 */
-  noteKey?: LedgerNoteKey;
+  /** 金額格／備註格右鍵時帶入；僅列操作可省略 */
+  noteKey?: SheetContextNoteKey;
   fpsEntryId?: string;
   expenseEntryId?: string;
   x: number;

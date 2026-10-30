@@ -21,19 +21,17 @@ describe("workResourceDailyNet", () => {
 });
 
 describe("computeWorkResourceRows", () => {
-  it("逐日累計", () => {
+  it("各列當日用量獨立計算", () => {
     const a = createEmptyWorkResourceRow("2026-01-01");
     a.counts.largeMachine = 4;
     const b = createEmptyWorkResourceRow("2026-01-02");
     b.counts.testGun = 1;
     const computed = computeWorkResourceRows([b, a]);
     expect(computed[0].dailyNet).toBe(4);
-    expect(computed[0].cumulative).toBe(4);
     expect(computed[1].dailyNet).toBe(-1);
-    expect(computed[1].cumulative).toBe(3);
+    expect(computed[1].dailyNet).not.toBe(computed[0].dailyNet);
     const totals = computeWorkResourceMonthTotals(computed);
     expect(totals.totalDailyNet).toBe(3);
-    expect(totals.closingCumulative).toBe(3);
   });
 });
 

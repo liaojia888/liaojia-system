@@ -328,6 +328,14 @@ export function useWorkResourceMonthData({
     setSyncStatus(cloudDirtyRef.current ? "cloud_pending" : "local_saved");
   }, []);
 
+  const persistBeforeShare = useCallback(async (): Promise<
+    { ok: true } | { ok: false; error: string }
+  > => {
+    const current = sortWorkResourceRows(rowsRef.current);
+    saveLocalWorkResourceMonth(monthKey, current);
+    return { ok: true };
+  }, [monthKey]);
+
   return {
     rows,
     setRows,
@@ -341,5 +349,6 @@ export function useWorkResourceMonthData({
     saveToCloud,
     applyCloudVersion,
     dismissCloudConflict,
+    persistBeforeShare,
   };
 }

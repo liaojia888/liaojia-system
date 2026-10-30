@@ -24,6 +24,7 @@ import {
   LedgerNoteEditor,
   type ContextMenuState,
   type NoteTarget,
+  type SheetContextNoteKey,
 } from "@/components/dashboard/LedgerNoteMenus";
 import { NotableAmountCell } from "@/components/dashboard/NotableAmountCell";
 import { readLocalCompanyName } from "@/lib/company-display-name";
@@ -53,6 +54,10 @@ function parseNum(raw: string): number {
 
 function monthKey(year: number, month: number) {
   return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+function isLedgerNoteKey(key: SheetContextNoteKey): key is LedgerNoteKey {
+  return key !== "rowNote";
 }
 
 const REVENUE_FIELDS = ["fuel", "water", "urea"] as const;
@@ -269,7 +274,9 @@ export function DailyLedgerSheet({
   const contextNoteText = useMemo(() => {
     if (!contextMenu) return "";
     const row = rows.find((r) => r.id === contextMenu.rowId);
-    if (!row || !contextMenu.noteKey) return "";
+    if (!row || !contextMenu.noteKey || !isLedgerNoteKey(contextMenu.noteKey)) {
+      return "";
+    }
     if (contextMenu.fpsEntryId) {
       return (
         row.fpsEntries.find((e) => e.id === contextMenu.fpsEntryId)?.note ?? ""
@@ -1016,7 +1023,9 @@ export function DailyLedgerSheet({
         hasNote={Boolean(contextNoteText.trim())}
         onClose={() => setContextMenu(null)}
         onEdit={() => {
-          if (!contextMenu?.noteKey) return;
+          if (!contextMenu?.noteKey || !isLedgerNoteKey(contextMenu.noteKey)) {
+            return;
+          }
           setNoteEditor({
             rowId: contextMenu.rowId,
             noteKey: contextMenu.noteKey,
@@ -1026,7 +1035,9 @@ export function DailyLedgerSheet({
           });
         }}
         onClearNote={() => {
-          if (!contextMenu?.noteKey) return;
+          if (!contextMenu?.noteKey || !isLedgerNoteKey(contextMenu.noteKey)) {
+            return;
+          }
           updateNote(
             contextMenu.rowId,
             contextMenu.noteKey,

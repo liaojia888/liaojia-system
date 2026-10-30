@@ -3,14 +3,29 @@
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import {
+  LedgerNoteContextMenu,
+  LedgerNoteEditor,
+  type ContextMenuState,
+} from "@/components/dashboard/LedgerNoteMenus";
+import { WorkResourceMobileRows } from "@/components/resources/WorkResourceMobileRows";
+import { useWorkResourceMonthData } from "@/hooks/useWorkResourceMonthData";
+import { readLocalCompanyName } from "@/lib/company-display-name";
+import {
   WORK_RESOURCE_CATEGORIES,
   computeWorkResourceMonthTotals,
   computeWorkResourceRows,
+  createEmptyWorkResourceRow,
+  sortWorkResourceRows,
   type WorkResourceCategoryKey,
   type WorkResourceRow,
 } from "@/lib/work-resources";
-import { WorkResourceMobileRows } from "@/components/resources/WorkResourceMobileRows";
-import { useWorkResourceMonthData } from "@/hooks/useWorkResourceMonthData";
+import {
+  formatWorkResourceMonthForWhatsApp,
+  formatWorkResourceRowForWhatsApp,
+  openWhatsAppShare,
+  shareViaWeChat,
+  weChatShareSuccessMessage,
+} from "@/lib/whatsapp-export";
 
 function formatNum(n: number): string {
   if (!n) return "";
@@ -53,6 +68,11 @@ export function WorkResourceSheet({
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [noteEditor, setNoteEditor] = useState<{
+    rowId: string;
+    initialText: string;
+  } | null>(null);
   const key = monthKey(year, month);
 
   const {
@@ -68,6 +88,7 @@ export function WorkResourceSheet({
     saveToCloud,
     applyCloudVersion,
     dismissCloudConflict,
+    persistBeforeShare,
   } = useWorkResourceMonthData({
     monthKey: key,
     year,
@@ -121,6 +142,91 @@ export function WorkResourceSheet({
     [setRows],
   );
 
+  const companyName = readLocalCompanyName() ?? "我的公司";
+
+  const openRowContextMenu = useCallback(
+    (e: React.MouseEvent, rowId: string) => {
+      e.preventDefault();
+      setContextMenu({ rowId, x: e.clientX, y: e.clientY });
+    },
+    [],
+  );
+
+  const openNoteContextMenu = useCallback(
+    (e: React.MouseEvent, rowId: string) => {
+      e.preventDefault();
+      setContextMenu({
+        rowId,
+        noteKey: "rowNote",
+        x: e.clientX,
+        y: e.clientY,
+      });
+    },
+    [],
+  );
+
+  const openMenuFromAnchor = useCallback(
+    (rowId: string, anchor: HTMLElement, noteKey?: ContextMenuState["noteKey"]) => {
+      const rect = anchor.getBoundingClientRect();
+      setContextMenu({
+        rowId,
+        noteKey,
+        x: Math.min(rect.left, window.innerWidth - 200),
+        y: rect.bottom + 4,
+      });
+    },
+    [],
+  );
+
+  const clearRow = useCallback(
+    (rowId: string) => {
+      if (!confirm("確定要清空這一行的數量與備註？（日期保留）")) return;
+      setRows((prev) =>
+        prev.map((row) => {
+          if (row.id !== rowId) return row;
+          return { ...createEmptyWorkResourceRow(row.date), id: row.id };
+        }),
+      );
+    },
+    [setRows],
+  );
+
+  const insertRowAfter = useCallback(
+    (rowId: string) => {
+      setRows((prev) => {
+        const sorted = sortWorkResourceRows(prev);
+        const index = sorted.findIndex((r) => r.id === rowId);
+        if (index === -1) return prev;
+        const anchor = sorted[index];
+        const newRow = createEmptyWorkResourceRow(anchor.date);
+        const next = [...sorted];
+        next.splice(index + 1, 0, newRow);
+        return next;
+      });
+    },
+    [setRows],
+  );
+
+  const removeRow = useCallback(
+    (rowId: string) => {
+      setRows((prev) => {
+        if (prev.length <= 1) {
+          alert("至少需保留一列。");
+          return prev;
+        }
+        if (!confirm("確定要移除此列？（含該列所有資料）")) return prev;
+        return prev.filter((row) => row.id !== rowId);
+      });
+    },
+    [setRows],
+  );
+
+  const contextNoteText = useMemo(() => {
+    if (!contextMenu?.noteKey) return "";
+    const row = rows.find((r) => r.id === contextMenu.rowId);
+    return row?.note ?? "";
+  }, [contextMenu, rows]);
+
   const syncLabel = syncStatusLabel(syncStatus, cloudDirty);
 
   if (!ready) {
@@ -141,9 +247,9 @@ export function WorkResourceSheet({
           資源進出表
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-600">
-          每日填寫四項數量；<strong className="font-semibold text-slate-800">當日淨值</strong>
-          ＝大機＋細機−試槍−漏油，<strong className="font-semibold text-slate-800">本月累計</strong>
-          為當月逐日加總。
+          每日填寫四項數量；
+          <strong className="font-semibold text-slate-800">當日用量</strong>
+          ＝大機＋細機−試槍−漏油（每列獨立計算，未填為 0）。
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
@@ -159,9 +265,9 @@ export function WorkResourceSheet({
             </div>
           ))}
           <div className="col-span-2 rounded-xl border border-emerald-200/90 bg-emerald-50/90 px-3 py-2.5 sm:col-span-1 lg:col-span-2">
-            <p className="text-[11px] font-medium text-emerald-800/90">本月累計（期末）</p>
+            <p className="text-[11px] font-medium text-emerald-800/90">本月用量加總</p>
             <p className="mt-0.5 text-xl font-bold tabular-nums text-emerald-900">
-              {formatSigned(totals.closingCumulative)}
+              {formatSigned(totals.totalDailyNet)}
             </p>
           </div>
         </div>
@@ -206,9 +312,12 @@ export function WorkResourceSheet({
         )}
 
         <p className="mt-2 text-xs text-slate-600 lg:hidden">
-          手機／平板：每日一張卡片，欄位較大、免橫向滑動；電腦寬螢幕顯示完整表格。
+          手機／平板：每日一張卡片；日期旁「列操作」等同右鍵選單。
         </p>
         <p className="mt-2 text-xs text-slate-600">
+          <span className="hidden lg:inline">
+            右鍵：備註、新增／移除列、清空、WhatsApp／微信匯出。
+          </span>
           編輯即存本機。
           {organizationId ? (
             <>
@@ -289,6 +398,8 @@ export function WorkResourceSheet({
             parseNum={parseNum}
             updateRow={updateRow}
             updateCount={updateCount}
+            openRowMenu={(rowId, el) => openMenuFromAnchor(rowId, el)}
+            onNoteContextMenu={openNoteContextMenu}
           />
         </div>
 
@@ -312,13 +423,10 @@ export function WorkResourceSheet({
                     </th>
                   ))}
                   <th className="ledger-th ledger-th-accent min-w-[5.5rem]">
-                    當日淨值
+                    當日用量
                     <span className="block text-[10px] font-normal opacity-90">
                       大+細−槍−漏
                     </span>
-                  </th>
-                  <th className="ledger-th ledger-th-accent min-w-[5.5rem]">
-                    本月累計
                   </th>
                   <th className="ledger-th min-w-[8rem]">備註</th>
                 </tr>
@@ -328,8 +436,12 @@ export function WorkResourceSheet({
                   <tr
                     key={row.id}
                     className="group hover:bg-emerald-50/40"
+                    onContextMenu={(e) => openRowContextMenu(e, row.id)}
                   >
-                    <td className="ledger-td ledger-sticky-col sticky left-0 z-10 bg-white group-hover:bg-emerald-50/40">
+                    <td
+                      className="ledger-td ledger-sticky-col sticky left-0 z-10 bg-white group-hover:bg-emerald-50/40"
+                      onContextMenu={(e) => openRowContextMenu(e, row.id)}
+                    >
                       <input
                         type="date"
                         value={row.date}
@@ -340,7 +452,11 @@ export function WorkResourceSheet({
                       />
                     </td>
                     {WORK_RESOURCE_CATEGORIES.map(({ key }) => (
-                      <td key={`${row.id}-${key}`} className="ledger-td">
+                      <td
+                        key={`${row.id}-${key}`}
+                        className="ledger-td"
+                        onContextMenu={(e) => openRowContextMenu(e, row.id)}
+                      >
                         <input
                           type="text"
                           inputMode="numeric"
@@ -353,13 +469,16 @@ export function WorkResourceSheet({
                         />
                       </td>
                     ))}
-                    <td className="ledger-td computed font-medium tabular-nums">
+                    <td
+                      className="ledger-td computed font-semibold tabular-nums text-emerald-900"
+                      onContextMenu={(e) => openRowContextMenu(e, row.id)}
+                    >
                       {formatSigned(row.dailyNet)}
                     </td>
-                    <td className="ledger-td computed font-semibold tabular-nums text-emerald-900">
-                      {formatSigned(row.cumulative)}
-                    </td>
-                    <td className="ledger-td align-top">
+                    <td
+                      className="ledger-td align-top"
+                      onContextMenu={(e) => openNoteContextMenu(e, row.id)}
+                    >
                       <textarea
                         value={row.note}
                         rows={1}
@@ -386,14 +505,11 @@ export function WorkResourceSheet({
                       {formatNum(totals[key]) || "0"}
                     </td>
                   ))}
-                  <td className="ledger-td ledger-tfoot-cell ledger-tfoot-num ledger-tfoot-accent">
+                  <td className="ledger-td ledger-tfoot-cell ledger-tfoot-num ledger-tfoot-accent text-emerald-900">
                     {formatSigned(totals.totalDailyNet)}
                   </td>
-                  <td className="ledger-td ledger-tfoot-cell ledger-tfoot-num ledger-tfoot-accent text-emerald-900">
-                    {formatSigned(totals.closingCumulative)}
-                  </td>
                   <td className="ledger-td ledger-tfoot-cell text-xs text-slate-500">
-                    累計＝逐日淨值加總
+                    加總＝各日用量合計
                   </td>
                 </tr>
               </tfoot>
@@ -401,7 +517,118 @@ export function WorkResourceSheet({
           </div>
         </div>
       </div>
+
+      <LedgerNoteContextMenu
+        menu={contextMenu}
+        hasNote={Boolean(contextNoteText.trim())}
+        onClose={() => setContextMenu(null)}
+        onEdit={() => {
+          if (!contextMenu?.noteKey) return;
+          setNoteEditor({
+            rowId: contextMenu.rowId,
+            initialText: contextNoteText,
+          });
+        }}
+        onClearNote={() => {
+          if (!contextMenu?.noteKey) return;
+          updateRow(contextMenu.rowId, { note: "" });
+        }}
+        onInsertRow={() => {
+          if (!contextMenu) return;
+          insertRowAfter(contextMenu.rowId);
+        }}
+        onRemoveRow={() => {
+          if (!contextMenu) return;
+          removeRow(contextMenu.rowId);
+        }}
+        onClearRow={() => {
+          if (!contextMenu) return;
+          clearRow(contextMenu.rowId);
+        }}
+        onWhatsAppRow={() => {
+          if (!contextMenu) return;
+          const row = computed.find((r) => r.id === contextMenu.rowId);
+          if (!row) return;
+          void (async () => {
+            const saved = await persistBeforeShare();
+            if (!saved.ok) {
+              alert(saved.error);
+              return;
+            }
+            const result = openWhatsAppShare(
+              formatWorkResourceRowForWhatsApp(row, companyName),
+            );
+            if (!result.ok && result.error) alert(result.error);
+          })();
+        }}
+        onWhatsAppMonth={() => {
+          void (async () => {
+            const saved = await persistBeforeShare();
+            if (!saved.ok) {
+              alert(saved.error);
+              return;
+            }
+            const result = openWhatsAppShare(
+              formatWorkResourceMonthForWhatsApp(
+                computed,
+                totals,
+                year,
+                month,
+                companyName,
+              ),
+            );
+            if (!result.ok && result.error) alert(result.error);
+          })();
+        }}
+        onWeChatRow={() => {
+          if (!contextMenu) return;
+          const row = computed.find((r) => r.id === contextMenu.rowId);
+          if (!row) return;
+          void (async () => {
+            const saved = await persistBeforeShare();
+            if (!saved.ok) {
+              alert(saved.error);
+              return;
+            }
+            const result = await shareViaWeChat(
+              formatWorkResourceRowForWhatsApp(row, companyName),
+            );
+            if (!result.ok && result.error) alert(result.error);
+            else alert(weChatShareSuccessMessage(result.mode));
+          })();
+        }}
+        onWeChatMonth={() => {
+          void (async () => {
+            const saved = await persistBeforeShare();
+            if (!saved.ok) {
+              alert(saved.error);
+              return;
+            }
+            const result = await shareViaWeChat(
+              formatWorkResourceMonthForWhatsApp(
+                computed,
+                totals,
+                year,
+                month,
+                companyName,
+              ),
+            );
+            if (!result.ok && result.error) alert(result.error);
+            else alert(weChatShareSuccessMessage(result.mode));
+          })();
+        }}
+      />
+
+      <LedgerNoteEditor
+        open={Boolean(noteEditor)}
+        initialText={noteEditor?.initialText ?? ""}
+        onClose={() => setNoteEditor(null)}
+        onSave={(text) => {
+          if (!noteEditor) return;
+          updateRow(noteEditor.rowId, { note: text.trim() });
+          setNoteEditor(null);
+        }}
+      />
     </div>
   );
 }
-
