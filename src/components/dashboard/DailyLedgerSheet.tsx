@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   computeRows,
   computeTotals,
@@ -81,6 +82,9 @@ export function DailyLedgerSheet({
   const isWorkbench = ledgerLayout === "workbench";
   const isMobileSpreadsheet = layoutUsesMobileSpreadsheet(ledgerLayout);
 
+  const searchParams = useSearchParams();
+  const focusHighlightRef = useRef<string | null>(null);
+
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -114,8 +118,36 @@ export function DailyLedgerSheet({
     organizationId,
   });
 
+  useEffect(() => {
+    const y = searchParams.get("year");
+    const m = searchParams.get("month");
+    if (y && /^\d{4}$/.test(y)) setYear(Number(y));
+    if (m) {
+      const mn = Number.parseInt(m, 10);
+      if (mn >= 1 && mn <= 12) setMonth(mn);
+    }
+  }, [searchParams]);
+
   const computed = useMemo(() => computeRows(sortRowsByDate(rows)), [rows]);
   const totals = useMemo(() => computeTotals(computed), [computed]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const focus = searchParams.get("focus");
+    if (!focus || !/^\d{4}-\d{2}-\d{2}$/.test(focus)) return;
+    if (focusHighlightRef.current === focus) return;
+    focusHighlightRef.current = focus;
+    const timer = window.setTimeout(() => {
+      const el = document.querySelector(`[data-ledger-date="${focus}"]`);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("ring-2", "ring-[var(--theme-accent)]", "rounded-lg");
+      window.setTimeout(() => {
+        el.classList.remove("ring-2", "ring-[var(--theme-accent)]", "rounded-lg");
+      }, 2600);
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [ready, searchParams, rows]);
 
   const updateRow = useCallback(
     (id: string, patch: Partial<DailyLedgerRow>) => {

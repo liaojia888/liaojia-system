@@ -6,8 +6,10 @@ import {
   totalFpsOutflow,
   type DailyLedgerComputed,
   type DailyLedgerRow,
+  type DailyLedgerTotals,
   type LedgerNoteKey,
 } from "@/lib/daily-ledger";
+import type { YearMonthSummary } from "@/lib/ledger-analytics";
 
 function escapeCsv(value: string): string {
   if (/[",\n\r]/.test(value)) {
@@ -77,6 +79,35 @@ export function buildMonthCsv(
       .join(",");
   });
 
+  return `\uFEFF${headers.join(",")}\n${lines.join("\n")}\n`;
+}
+
+export function buildYearCsv(
+  year: number,
+  summaries: YearMonthSummary[],
+  yearTotals: DailyLedgerTotals,
+): string {
+  const headers = ["月份", "淨收入", "支出", "期末尾數"];
+  const lines = summaries.map((s) =>
+    [
+      s.hasData ? `${year}-${String(s.month).padStart(2, "0")}` : `${year}-${String(s.month).padStart(2, "0")}（無資料）`,
+      s.hasData ? s.totals.totalRevenue : "",
+      s.hasData ? s.totals.expenses : "",
+      s.hasData ? s.totals.closingBalance : "",
+    ]
+      .map((v) => escapeCsv(String(v ?? "")))
+      .join(","),
+  );
+  lines.push(
+    [
+      "年度合計",
+      yearTotals.totalRevenue,
+      yearTotals.expenses,
+      yearTotals.closingBalance,
+    ]
+      .map((v) => escapeCsv(String(v ?? "")))
+      .join(","),
+  );
   return `\uFEFF${headers.join(",")}\n${lines.join("\n")}\n`;
 }
 

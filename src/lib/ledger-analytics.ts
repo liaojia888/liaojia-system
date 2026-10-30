@@ -50,17 +50,78 @@ export type DailyTrendPoint = {
   date: string;
   label: string;
   totalRevenue: number;
+  /** 年度各月圖：該月是否有日結資料 */
+  hasData?: boolean;
 };
 
-export function buildDailyRevenueTrend(rows: DailyLedgerRow[]): DailyTrendPoint[] {
+function isoDateLocal(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function formatReportRangeLabel(
+  rangeStart: string,
+  rangeEnd: string,
+  bounds: { start: string; end: string },
+): string | null {
+  if (rangeStart === bounds.start && rangeEnd === bounds.end) return null;
+  const fmt = (iso: string) =>
+    new Date(`${iso}T12:00:00`).toLocaleDateString("zh-TW", {
+      month: "numeric",
+      day: "numeric",
+    });
+  return `${fmt(rangeStart)}–${fmt(rangeEnd)}`;
+}
+
+export function buildDailyRevenueTrend(
+  rows: DailyLedgerRow[],
+  range: { start: string; end: string },
+): DailyTrendPoint[] {
   const computed = computeRows(sortRowsByDate(rows));
-  return computed
-    .filter((r) => r.totalRevenue !== 0 || r.expenses !== 0)
-    .map((r) => ({
-      date: r.date,
-      label: r.date.slice(8),
-      totalRevenue: r.totalRevenue,
-    }));
+  const byDate = new Map(computed.map((r) => [r.date, r]));
+  const points: DailyTrendPoint[] = [];
+  const cursor = new Date(`${range.start}T12:00:00`);
+  const end = new Date(`${range.end}T12:00:00`);
+  while (cursor <= end) {
+    const iso = isoDateLocal(cursor);
+    const row = byDate.get(iso);
+    points.push({
+      date: iso,
+      label: iso.slice(8),
+      totalRevenue: row?.totalRevenue ?? 0,
+    });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return points;
+}
+
+export function buildYearMonthlyTrend(
+  summaries: YearMonthSummary[],
+): DailyTrendPoint[] {
+  return summaries.map((s) => ({
+    date: s.monthKey,
+    label: `${s.month}月`,
+    totalRevenue: s.hasData ? s.totals.totalRevenue : 0,
+    hasData: s.hasData,
+  }));
+}
+
+export function revenueChangePercent(
+  current: number,
+  previous: number,
+): number | null {
+  if (previous === 0) {
+    return current === 0 ? null : null;
+  }
+  return ((current - previous) / Math.abs(previous)) * 100;
+}
+
+export function formatChangePercent(pct: number | null): string {
+  if (pct === null) return "—";
+  const sign = pct > 0 ? "+" : "";
+  return `${sign}${pct.toFixed(1)}%`;
 }
 
 export type YearMonthSummary = {

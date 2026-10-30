@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   LedgerNoteContextMenu,
   LedgerNoteEditor,
@@ -65,9 +66,20 @@ export function WorkResourceSheet({
 }: {
   organizationId: string | null;
 }) {
+  const searchParams = useSearchParams();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+
+  useEffect(() => {
+    const y = searchParams.get("year");
+    const m = searchParams.get("month");
+    if (y && /^\d{4}$/.test(y)) setYear(Number(y));
+    if (m) {
+      const mn = Number.parseInt(m, 10);
+      if (mn >= 1 && mn <= 12) setMonth(mn);
+    }
+  }, [searchParams]);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [noteEditor, setNoteEditor] = useState<{
     rowId: string;

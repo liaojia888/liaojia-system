@@ -120,6 +120,36 @@ export function formatLedgerRowForWhatsApp(
     .trim();
 }
 
+export function formatLedgerYearForWhatsApp(
+  summaries: {
+    month: number;
+    hasData: boolean;
+    totals: DailyLedgerTotals;
+  }[],
+  yearTotals: DailyLedgerTotals,
+  year: number,
+  companyName: string,
+): string {
+  const monthLines = summaries
+    .filter((s) => s.hasData)
+    .map(
+      (s) =>
+        `${s.month}月 淨收 ${money(s.totals.totalRevenue)} | 支出 ${money(s.totals.expenses)} | 尾數 ${money(s.totals.closingBalance)}`,
+    )
+    .join("\n");
+
+  return [
+    `【${year}年 日結年度摘要】${companyName}`,
+    "",
+    monthLines || "（本年尚無資料）",
+    "",
+    "— 年度合計 —",
+    `淨收入：${money(yearTotals.totalRevenue)}`,
+    `支出：${money(yearTotals.expenses)}`,
+    `期末尾數：${money(yearTotals.closingBalance)}（取最後有資料月份）`,
+  ].join("\n");
+}
+
 export function formatLedgerMonthForWhatsApp(
   rows: DailyLedgerComputed[],
   totals: DailyLedgerTotals,

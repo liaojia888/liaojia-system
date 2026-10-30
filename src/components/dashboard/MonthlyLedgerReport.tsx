@@ -1,24 +1,30 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { fetchLedgerMonth } from "@/app/actions/daily-ledger";
 import {
   LEDGER_NOTE_LABELS,
   computeRows,
   sortRowsByDate,
+  type DailyLedgerRow,
   type LedgerNoteKey,
 } from "@/lib/daily-ledger";
+import { loadLocalMonth } from "@/lib/ledger-local-store";
 import { useLedgerMonthData } from "@/hooks/useLedgerMonthData";
-import { useLedgerYearData } from "@/hooks/useLedgerYearData";
 import {
-  aggregateYearTotals,
   buildDailyRevenueTrend,
   filterRowsByDateRange,
+  formatChangePercent,
+  formatReportRangeLabel,
   monthBounds,
+  revenueChangePercent,
   summarizeRows,
-  summarizeYearFromMonths,
 } from "@/lib/ledger-analytics";
 import { LedgerTrendChart } from "@/components/dashboard/LedgerTrendChart";
+import { ReportPageSkeleton } from "@/components/dashboard/ReportPageSkeleton";
+import { YearLedgerReportSection } from "@/components/dashboard/YearLedgerReportSection";
 import { buildMonthCsv, downloadTextFile } from "@/lib/ledger-export";
 import { readLocalCompanyName } from "@/lib/company-display-name";
 import {
@@ -42,6 +48,32 @@ function money(n: number) {
 
 type ReportView = "month" | "year";
 
+const YEAR_OPTIONS = Array.from({ length: 8 }, (_, i) => new Date().getFullYear() - 5 + i);
+
+function shiftCalendarMonth(year: number, month: number, delta: number) {
+  const d = new Date(year, month - 1 + delta, 1);
+  return { year: d.getFullYear(), month: d.getMonth() + 1 };
+}
+
+function ledgerFocusHref(isoDate: string) {
+  const y = isoDate.slice(0, 4);
+  const m = Number.parseInt(isoDate.slice(5, 7), 10);
+  return `/dashboard?year=${y}&month=${m}&focus=${encodeURIComponent(isoDate)}`;
+}
+
+function resourcesMonthHref(year: number, month: number) {
+  return `/resources?year=${year}&month=${month}`;
+}
+
+function reportSyncLabel(syncStatus: string): string | null {
+  if (syncStatus === "syncing") return "寫入 Supabase…";
+  if (syncStatus === "cloud_pending") return "本機有變更 · 日結表可「儲存至 Supabase」";
+  if (syncStatus === "local_only") return "僅本機（未連公司）";
+  if (syncStatus === "conflict") return "雲端版本衝突 · 請至日結表處理";
+  if (syncStatus === "error") return "雲端同步失敗";
+  return null;
+}
+
 export function MonthlyLedgerReport({
   organizationId,
 }: {
@@ -52,6 +84,8 @@ export function MonthlyLedgerReport({
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [noteQuery, setNoteQuery] = useState("");
+  const [yearLoadingCloud, setYearLoadingCloud] = useState(false);
+  const [prevMonthRows, setPrevMonthRows] = useState<DailyLedgerRow[]>([]);
   const bounds = monthBounds(year, month);
   const [rangeStart, setRangeStart] = useState(bounds.start);
   const [rangeEnd, setRangeEnd] = useState(bounds.end);
@@ -62,6 +96,10 @@ export function MonthlyLedgerReport({
     setRangeEnd(b.end);
   }, [year, month]);
 
+  useEffect(() => {
+    if (view !== "year") setYearLoadingCloud(false);
+  }, [view]);
+
   const key = monthKey(year, month);
 
   const { rows, ready, syncStatus, persistBeforeShare } = useLedgerMonthData({
@@ -71,11 +109,24 @@ export function MonthlyLedgerReport({
     organizationId,
   });
 
-  const {
-    months: yearMonths,
-    ready: yearReady,
-    loadingCloud: yearLoadingCloud,
-  } = useLedgerYearData({ year, organizationId });
+  const prevMonth = useMemo(() => shiftCalendarMonth(year, month, -1), [year, month]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const pk = monthKey(prevMonth.year, prevMonth.month);
+    const local = loadLocalMonth(pk) ?? [];
+    setPrevMonthRows(local);
+    if (!organizationId) return () => {
+      cancelled = true;
+    };
+    void fetchLedgerMonth(pk).then((remote) => {
+      if (cancelled || !remote.ok || !remote.data?.rows.length) return;
+      setPrevMonthRows(remote.data.rows);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [prevMonth.year, prevMonth.month, organizationId]);
 
   const filteredRows = useMemo(
     () => filterRowsByDateRange(sortRowsByDate(rows), rangeStart, rangeEnd),
@@ -87,22 +138,35 @@ export function MonthlyLedgerReport({
     [filteredRows],
   );
 
+  const rangeLabel = useMemo(
+    () => formatReportRangeLabel(rangeStart, rangeEnd, bounds),
+    [rangeStart, rangeEnd, bounds],
+  );
+
+  const isFullMonthRange =
+    rangeStart === bounds.start && rangeEnd === bounds.end;
+
+  const prevMonthTotals = useMemo(
+    () => summarizeRows(prevMonthRows).totals,
+    [prevMonthRows],
+  );
+
+  const revenueMomPct = useMemo(
+    () =>
+      isFullMonthRange
+        ? revenueChangePercent(totals.totalRevenue, prevMonthTotals.totalRevenue)
+        : null,
+    [isFullMonthRange, totals.totalRevenue, prevMonthTotals.totalRevenue],
+  );
+
   const trendPoints = useMemo(
-    () => buildDailyRevenueTrend(filteredRows),
-    [filteredRows],
+    () =>
+      buildDailyRevenueTrend(filteredRows, {
+        start: rangeStart,
+        end: rangeEnd,
+      }),
+    [filteredRows, rangeStart, rangeEnd],
   );
-
-  const yearSummaries = useMemo(
-    () => summarizeYearFromMonths(year, yearMonths),
-    [year, yearMonths],
-  );
-
-  const yearTotals = useMemo(
-    () => aggregateYearTotals(yearSummaries),
-    [yearSummaries],
-  );
-
-  const yearHasData = yearSummaries.some((s) => s.hasData);
 
   const noteSections = useMemo(() => {
     const q = noteQuery.trim().toLowerCase();
@@ -110,6 +174,7 @@ export function MonthlyLedgerReport({
     const sections: {
       rowId: string;
       dateLabel: string;
+      focusDate: string;
       items: { label: string; text: string }[];
     }[] = [];
 
@@ -139,7 +204,12 @@ export function MonthlyLedgerReport({
           })
         : "（未填日期）";
 
-      sections.push({ rowId: row.id, dateLabel, items });
+      sections.push({
+        rowId: row.id,
+        dateLabel,
+        focusDate: row.date,
+        items,
+      });
     }
 
     return sections;
@@ -205,10 +275,10 @@ export function MonthlyLedgerReport({
   }
 
   const syncHint =
-    syncStatus === "syncing"
-      ? "寫入 Supabase…"
-      : view === "year" && yearLoadingCloud
-        ? "載入年度 Supabase 資料…"
+    view === "year" && yearLoadingCloud
+      ? "載入年度 Supabase 資料…"
+      : view === "month"
+        ? reportSyncLabel(syncStatus)
         : null;
 
   return (
@@ -219,8 +289,45 @@ export function MonthlyLedgerReport({
             <p className="ledger-hero-kicker text-[10px] font-bold uppercase tracking-[0.25em] sm:text-xs">
               {view === "month" ? "Monthly Report" : "Annual Report"}
             </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+            <div className="ledger-no-print mt-2 flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-1.5 text-sm">
+                <span className="sr-only">年份</span>
+                <select
+                  value={year}
+                  onChange={(e) => setYear(Number(e.target.value))}
+                  className="rounded-lg border border-slate-300 bg-white/80 px-2 py-1.5 text-sm font-medium"
+                >
+                  {YEAR_OPTIONS.map((y) => (
+                    <option key={y} value={y}>
+                      {y} 年
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {view === "month" ? (
+                <label className="flex items-center gap-1.5 text-sm">
+                  <span className="sr-only">月份</span>
+                  <select
+                    value={month}
+                    onChange={(e) => setMonth(Number(e.target.value))}
+                    className="rounded-lg border border-slate-300 bg-white/80 px-2 py-1.5 text-sm font-medium"
+                  >
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                      <option key={m} value={m}>
+                        {m} 月
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+            </div>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
               {year} 年{view === "month" ? ` ${month} 月` : " 度"}
+              {view === "month" && rangeLabel ? (
+                <span className="ml-2 text-lg font-medium text-slate-600">
+                  （{rangeLabel}）
+                </span>
+              ) : null}
             </h1>
             <p className="mt-0.5 text-sm font-medium text-slate-600">
               {view === "month" ? "月結摘要" : "年度合計"}
@@ -309,32 +416,21 @@ export function MonthlyLedgerReport({
           </div>
         </div>
 
-        {view === "month" && hasAnyData ? (
+        {view === "month" && ready && hasAnyData ? (
           <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <SummaryStat label="淨收入（扣撤單）" value={money(totals.totalRevenue)} accent />
+            <SummaryStat
+              label="淨收入（扣撤單）"
+              value={money(totals.totalRevenue)}
+              accent
+              hint={
+                isFullMonthRange
+                  ? `較 ${prevMonth.month} 月 ${formatChangePercent(revenueMomPct)}`
+                  : undefined
+              }
+            />
             <SummaryStat label="總支出" value={money(totals.expenses)} />
             <SummaryStat label="待入銀行" value={money(totals.bankPending)} />
             <SummaryStat label="期末尾數" value={money(totals.closingBalance)} accent />
-          </div>
-        ) : null}
-
-        {view === "year" && yearHasData ? (
-          <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <SummaryStat
-              label="年度總收入"
-              value={money(yearTotals.totalRevenue)}
-              accent
-            />
-            <SummaryStat label="年度支出" value={money(yearTotals.expenses)} />
-            <SummaryStat
-              label="待入銀行（累計）"
-              value={money(yearTotals.bankPending)}
-            />
-            <SummaryStat
-              label="期末尾數"
-              value={money(yearTotals.closingBalance)}
-              accent
-            />
           </div>
         ) : null}
       </header>
@@ -354,23 +450,22 @@ export function MonthlyLedgerReport({
             setRangeEnd={setRangeEnd}
             bounds={bounds}
             trendPoints={trendPoints}
+            year={year}
+            month={month}
             onPrint={() => window.print()}
             onExportCsv={exportMonthCsv}
             onWhatsApp={shareWhatsAppMonth}
             onWeChat={shareWeChatMonth}
           />
         ) : (
-          <YearReportBody
-            ready={yearReady}
+          <YearLedgerReportSection
             year={year}
-            summaries={yearSummaries}
-            yearHasData={yearHasData}
-            yearTotals={yearTotals}
+            organizationId={organizationId}
+            loadingCloudHint={setYearLoadingCloud}
             onPickMonth={(m) => {
               setView("month");
               setMonth(m);
             }}
-            onPrint={() => window.print()}
           />
         )}
       </div>
@@ -391,6 +486,8 @@ function MonthReportBody({
   setRangeEnd,
   bounds,
   trendPoints,
+  year,
+  month,
   onPrint,
   onExportCsv,
   onWhatsApp,
@@ -402,6 +499,7 @@ function MonthReportBody({
   noteSections: {
     rowId: string;
     dateLabel: string;
+    focusDate: string;
     items: { label: string; text: string }[];
   }[];
   noteQuery: string;
@@ -412,17 +510,17 @@ function MonthReportBody({
   setRangeEnd: (v: string) => void;
   bounds: { start: string; end: string };
   trendPoints: ReturnType<typeof buildDailyRevenueTrend>;
+  year: number;
+  month: number;
   onPrint: () => void;
   onExportCsv: () => void;
   onWhatsApp: () => void;
   onWeChat: () => void;
 }) {
+  const router = useRouter();
+
   if (!ready) {
-    return (
-      <div className="report-page-card rounded-2xl p-6 text-sm text-slate-600">
-        載入月結資料…
-      </div>
-    );
+    return <ReportPageSkeleton />;
   }
 
   if (!hasAnyData) {
@@ -482,12 +580,23 @@ function MonthReportBody({
             className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
           />
         </label>
-        <div className="flex flex-wrap gap-2">
-          <ActionBtn onClick={onExportCsv}>匯出 CSV</ActionBtn>
-          <ActionBtn onClick={onWhatsApp}>WhatsApp</ActionBtn>
-          <ActionBtn onClick={onWeChat}>微信</ActionBtn>
-          <ActionBtn onClick={onPrint}>列印</ActionBtn>
-        </div>
+        <details className="ledger-no-print w-full sm:w-auto">
+          <summary className="ledger-touch-btn ledger-btn-ghost cursor-pointer list-none rounded-full px-4 py-2 text-sm font-medium shadow-sm [&::-webkit-details-marker]:hidden">
+            分享與匯出
+          </summary>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <ActionBtn onClick={onExportCsv}>匯出 CSV</ActionBtn>
+            <ActionBtn onClick={onWhatsApp}>WhatsApp</ActionBtn>
+            <ActionBtn onClick={onWeChat}>微信</ActionBtn>
+            <ActionBtn onClick={onPrint}>列印</ActionBtn>
+          </div>
+        </details>
+        <Link
+          href={resourcesMonthHref(year, month)}
+          className="ledger-no-print text-sm font-medium text-[var(--theme-accent-strong)]"
+        >
+          同月工作資源進出表 →
+        </Link>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -515,7 +624,12 @@ function MonthReportBody({
         </ReportBlock>
       </div>
 
-      <LedgerTrendChart points={trendPoints} />
+      <LedgerTrendChart
+        points={trendPoints}
+        onPointClick={(p) => {
+          if (p.date) router.push(ledgerFocusHref(p.date));
+        }}
+      />
 
       {noteSections.length > 0 ? (
         <section className="report-notes-panel report-page-card rounded-2xl border p-4 sm:p-5">
@@ -530,7 +644,16 @@ function MonthReportBody({
                 className="report-note-item rounded-xl border p-3 sm:p-4"
               >
                 <p className="text-sm font-semibold text-slate-900">
-                  {section.dateLabel}
+                  {section.focusDate ? (
+                    <Link
+                      href={ledgerFocusHref(section.focusDate)}
+                      className="report-theme-link"
+                    >
+                      {section.dateLabel}
+                    </Link>
+                  ) : (
+                    section.dateLabel
+                  )}
                 </p>
                 <ul className="mt-2 space-y-2">
                   {section.items.map((item) => (
@@ -561,148 +684,6 @@ function MonthReportBody({
   );
 }
 
-function YearReportBody({
-  ready,
-  year,
-  summaries,
-  yearHasData,
-  yearTotals,
-  onPickMonth,
-  onPrint,
-}: {
-  ready: boolean;
-  year: number;
-  summaries: ReturnType<typeof summarizeYearFromMonths>;
-  yearHasData: boolean;
-  yearTotals: ReturnType<typeof aggregateYearTotals>;
-  onPickMonth: (month: number) => void;
-  onPrint: () => void;
-}) {
-  if (!ready) {
-    return (
-      <div className="report-page-card rounded-2xl p-6 text-sm text-slate-600">
-        載入年度資料…
-      </div>
-    );
-  }
-
-  if (!yearHasData) {
-    return (
-      <div className="report-page-card rounded-2xl p-6 text-sm text-slate-600">
-        {year} 年尚無日結資料。請先在{" "}
-        <Link href="/dashboard" className="report-theme-link">
-          日結表
-        </Link>{" "}
-        輸入任一月資料。
-      </div>
-    );
-  }
-
-  const maxRevenue = Math.max(
-    ...summaries.map((s) => s.totals.totalRevenue),
-    1,
-  );
-
-  return (
-    <>
-      <div className="ledger-no-print flex justify-end">
-        <ActionBtn onClick={onPrint}>列印年度摘要</ActionBtn>
-      </div>
-      <section className="report-page-card rounded-2xl p-4 sm:p-5">
-        <h2 className="report-block-title text-base font-semibold">
-          各月總收入趨勢
-        </h2>
-        <div className="mt-4 flex items-end gap-2 overflow-x-auto pb-2">
-          {summaries.map((s) => {
-            const h = Math.max(
-              4,
-              Math.round((s.totals.totalRevenue / maxRevenue) * 100),
-            );
-            return (
-              <button
-                key={s.monthKey}
-                type="button"
-                onClick={() => s.hasData && onPickMonth(s.month)}
-                disabled={!s.hasData}
-                className="flex min-w-[2.5rem] flex-col items-center gap-1 disabled:opacity-40"
-                title={
-                  s.hasData
-                    ? `${s.month} 月：${money(s.totals.totalRevenue)}`
-                    : `${s.month} 月無資料`
-                }
-              >
-                <div
-                  className="ledger-trend-bar w-7 rounded-t-md"
-                  style={{ height: `${h}px` }}
-                />
-                <span className="text-xs font-medium">{s.month}月</span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="report-page-card overflow-x-auto rounded-2xl p-4 sm:p-5">
-        <h2 className="report-block-title text-base font-semibold">月份明細</h2>
-        <table className="mt-4 min-w-full text-sm">
-          <thead>
-            <tr className="border-b text-left text-slate-600">
-              <th className="pb-2 pr-4 font-medium">月份</th>
-              <th className="pb-2 pr-4 text-right font-medium">總收入</th>
-              <th className="pb-2 pr-4 text-right font-medium">支出</th>
-              <th className="pb-2 text-right font-medium">期末尾數</th>
-            </tr>
-          </thead>
-          <tbody>
-            {summaries.map((s) => (
-              <tr key={s.monthKey} className="border-t border-slate-100">
-                <td className="py-2 pr-4">
-                  {s.hasData ? (
-                    <button
-                      type="button"
-                      onClick={() => onPickMonth(s.month)}
-                      className="report-theme-link font-medium"
-                    >
-                      {year} 年 {s.month} 月
-                    </button>
-                  ) : (
-                    <span className="text-slate-400">
-                      {year} 年 {s.month} 月
-                    </span>
-                  )}
-                </td>
-                <td className="py-2 pr-4 text-right tabular-nums">
-                  {s.hasData ? money(s.totals.totalRevenue) : "—"}
-                </td>
-                <td className="py-2 pr-4 text-right tabular-nums">
-                  {s.hasData ? money(s.totals.expenses) : "—"}
-                </td>
-                <td className="py-2 text-right tabular-nums">
-                  {s.hasData ? money(s.totals.closingBalance) : "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="border-t border-slate-300 font-semibold">
-              <td className="py-3 pr-4">年度合計</td>
-              <td className="py-3 pr-4 text-right tabular-nums">
-                {money(yearTotals.totalRevenue)}
-              </td>
-              <td className="py-3 pr-4 text-right tabular-nums">
-                {money(yearTotals.expenses)}
-              </td>
-              <td className="py-3 text-right tabular-nums">
-                {money(yearTotals.closingBalance)}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </section>
-    </>
-  );
-}
-
 function ActionBtn({
   children,
   onClick,
@@ -725,10 +706,12 @@ function SummaryStat({
   label,
   value,
   accent,
+  hint,
 }: {
   label: string;
   value: string;
   accent?: boolean;
+  hint?: string;
 }) {
   return (
     <div
@@ -745,6 +728,9 @@ function SummaryStat({
       >
         {value}
       </p>
+      {hint ? (
+        <p className="mt-1 text-[11px] font-medium text-slate-500">{hint}</p>
+      ) : null}
     </div>
   );
 }
