@@ -28,6 +28,27 @@ const navItems = [
     ),
   },
   {
+    href: "/resources",
+    label: "資源進出",
+    short: "資",
+    icon: (
+      <svg
+        className="h-5 w-5 shrink-0"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        aria-hidden
+      >
+        <path
+          d="M4 7h6v10H4V7zm10 0h6v6h-6V7zm0 8h6v2h-6v-2z"
+          strokeLinejoin="round"
+        />
+        <path d="M8 11h2M8 14h2" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/reports",
     label: "月結摘要",
     short: "月",
