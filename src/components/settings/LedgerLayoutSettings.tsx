@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { LEDGER_LAYOUT_OPTIONS } from "@/lib/ledger-layout";
+import {
+  LEDGER_LAYOUT_OPTIONS,
+  type LedgerLayoutId,
+} from "@/lib/ledger-layout";
 import { useLedgerLayout } from "@/components/providers/LedgerLayoutProvider";
 
-function LayoutPreview({ id }: { id: "spreadsheet" | "workbench" }) {
+function LayoutPreview({ id }: { id: LedgerLayoutId }) {
   if (id === "workbench") {
     return (
       <div className="flex h-16 flex-col gap-1 bg-slate-50 p-2">
@@ -16,6 +19,21 @@ function LayoutPreview({ id }: { id: "spreadsheet" | "workbench" }) {
           <span className="h-3 rounded border border-slate-200 bg-white" />
           <span className="h-3 rounded border border-slate-200 bg-white" />
           <span className="h-3 w-[80%] rounded border border-slate-200 bg-white" />
+        </div>
+      </div>
+    );
+  }
+  if (id === "spreadsheetMobile") {
+    return (
+      <div className="flex h-16 flex-col gap-1 bg-slate-50 p-2">
+        <div className="flex gap-1">
+          <span className="h-2 flex-1 rounded bg-emerald-700/80" />
+          <span className="h-2 w-6 rounded bg-amber-400/80" title="支出欄" />
+        </div>
+        <div className="grid flex-1 grid-cols-5 gap-px overflow-hidden rounded border border-slate-200 bg-slate-200">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <span key={i} className="bg-white" />
+          ))}
         </div>
       </div>
     );

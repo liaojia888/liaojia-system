@@ -1,7 +1,7 @@
 export const LEDGER_LAYOUT_STORAGE_KEY = "accounting-ledger-layout";
 export const LEDGER_LAYOUT_USER_META_KEY = "ledger_layout";
 
-export type LedgerLayoutId = "spreadsheet" | "workbench";
+export type LedgerLayoutId = "spreadsheet" | "workbench" | "spreadsheetMobile";
 
 export type LedgerLayoutOption = {
   id: LedgerLayoutId;
@@ -23,6 +23,13 @@ export const LEDGER_LAYOUT_OPTIONS: LedgerLayoutOption[] = [
     name: "工作台視圖",
     description: "以「每日卡片」編輯，工具列精簡，手機與平板較好操作。",
     tags: ["卡片逐日", "精簡頁首"],
+  },
+  {
+    id: "spreadsheetMobile",
+    name: "試算表（支出明細）",
+    description:
+      "整月試算表；支出明細以「類型下拉 ＋ 細項 ＋ 金額」列輸入，手機可左右滑動。",
+    tags: ["下拉式支出", "手機可滑動", "整月表格"],
   },
 ];
 
@@ -57,4 +64,9 @@ export function writeStoredLedgerLayout(layout: LedgerLayoutId) {
   } catch {
     // ignore
   }
+}
+
+/** 手機也顯示試算表（非卡片） */
+export function layoutUsesMobileSpreadsheet(layout: LedgerLayoutId): boolean {
+  return layout === "spreadsheetMobile";
 }

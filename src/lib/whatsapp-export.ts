@@ -89,7 +89,7 @@ export function formatLedgerRowForWhatsApp(
   companyName: string,
 ): string {
   const balanceLine = isLedgerRowActive(row)
-    ? `\n尾數：${money(row.balance)}`
+    ? `\n當日尾數：${money(row.dailyBalance)}`
     : "";
 
   return [
@@ -134,7 +134,7 @@ export function formatLedgerMonthForWhatsApp(
               `▸ ${formatDateZh(row.date)}`,
               `  油/水/尿素：${money(row.fuel)}/${money(row.water)}/${money(row.urea)}`,
               `  轉數快 ${fps} | 入銀：${money(row.bankDeposited)} | 待入：${money(row.bankPending)}`,
-              `  撤單：${money(row.cancelled)} | 支出 ${exp} | 尾數：${money(row.balance)}`,
+              `  撤單：${money(row.cancelled)} | 支出 ${exp} | 當日尾數：${money(row.dailyBalance)}`,
             ].join("\n");
           })
           .join("\n");
@@ -202,25 +202,17 @@ export function openWhatsAppShare(text: string): { ok: boolean; error?: string }
 export type WeChatShareResult = {
   ok: boolean;
   error?: string;
-  /** share＝系統分享 sheet；clipboard＝已複製，需自行到微信貼上 */
-  mode?: "share" | "clipboard";
+  /** 與 WhatsApp 相同之純文字；一律複製到剪貼簿後到微信貼上 */
+  mode?: "clipboard";
 };
 
-/** 微信無公開網址帶文；優先 Web Share，否則複製到剪貼簿 */
+/**
+ * 微信沒有像 WhatsApp 的 wa.me/?text= 帶文連結；
+ * Web Share 在微信常變成連結卡片或截圖，故一律複製純文字。
+ */
 export async function shareViaWeChat(text: string): Promise<WeChatShareResult> {
   const prepared = prepareShareText(text);
   if (!prepared.ok) return prepared;
-
-  if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
-    try {
-      await navigator.share({ text: prepared.text });
-      return { ok: true, mode: "share" };
-    } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") {
-        return { ok: false, error: "已取消分享" };
-      }
-    }
-  }
 
   try {
     await copyTextToClipboard(prepared.text);
@@ -230,9 +222,8 @@ export async function shareViaWeChat(text: string): Promise<WeChatShareResult> {
   }
 }
 
-export function weChatShareSuccessMessage(mode: WeChatShareResult["mode"]): string | null {
-  if (mode === "clipboard") {
-    return "已複製到剪貼簿，請開啟微信並貼上分享。";
-  }
-  return null;
+export function weChatShareSuccessMessage(
+  _mode?: WeChatShareResult["mode"],
+): string {
+  return "日結文字已複製（與 WhatsApp 相同格式）。請開啟微信 → 選聊天 → 長按輸入框貼上。";
 }

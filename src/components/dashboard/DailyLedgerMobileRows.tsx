@@ -299,11 +299,11 @@ export function DailyLedgerMobileRows({
           </div>
 
           <div className="mt-3 flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5">
-            <span className="text-sm font-medium text-emerald-900">尾數</span>
+            <span className="text-sm font-medium text-emerald-900">當日尾數</span>
             <span className="text-base font-semibold tabular-nums text-emerald-900">
               {isLedgerRowActive(row)
-                ? formatNum(row.balance) || "0"
-                : "—"}
+                ? formatNum(row.dailyBalance) || "0"
+                : "0"}
             </span>
           </div>
         </article>

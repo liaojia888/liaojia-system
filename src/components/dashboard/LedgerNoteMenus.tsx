@@ -201,7 +201,7 @@ export function LedgerNoteContextMenu({
           onClose();
         }}
       >
-        微信匯出此列
+        微信（複製文字）
       </button>
       <button
         type="button"
@@ -212,7 +212,7 @@ export function LedgerNoteContextMenu({
           onClose();
         }}
       >
-        微信匯出本月
+        微信本月（複製文字）
       </button>
     </>
   );

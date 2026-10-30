@@ -552,6 +552,16 @@ html:not([data-app-theme]) {
   font-size: 16px;
 }
 
+.ledger-unified-outflow select {
+  appearance: auto;
+  -webkit-appearance: menulist-button;
+  color: #0f172a;
+}
+
+.ledger-unified-outflow select:disabled {
+  opacity: 1;
+}
+
 @media (min-width: 1024px) {
   .ledger-touch-input {
     font-size: 0.875rem;

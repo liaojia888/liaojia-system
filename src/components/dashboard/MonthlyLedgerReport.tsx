@@ -199,8 +199,7 @@ export function MonthlyLedgerReport({
       if (!result.ok && result.error) {
         window.alert(result.error);
       } else {
-        const msg = weChatShareSuccessMessage(result.mode);
-        if (msg) window.alert(msg);
+        window.alert(weChatShareSuccessMessage(result.mode));
       }
     })();
   }

@@ -32,6 +32,7 @@ describe("computeRows 尾數累計", () => {
         expenseEntries: [{ id: "e1", label: "", amount: 300 }],
       }),
     ]);
+    expect(computed[1].dailyBalance).toBe(-300);
     expect(computed[1].balance).toBe(700);
   });
 

@@ -34,7 +34,9 @@ import {
   weChatShareSuccessMessage,
 } from "@/lib/whatsapp-export";
 import { DailyLedgerMobileRows } from "@/components/dashboard/DailyLedgerMobileRows";
+import { LedgerUnifiedOutflowEditor } from "@/components/dashboard/LedgerUnifiedOutflowEditor";
 import { useLedgerLayout } from "@/components/providers/LedgerLayoutProvider";
+import { layoutUsesMobileSpreadsheet } from "@/lib/ledger-layout";
 import { useLedgerMonthData } from "@/hooks/useLedgerMonthData";
 import { buildMonthCsv, downloadTextFile } from "@/lib/ledger-export";
 
@@ -71,6 +73,7 @@ export function DailyLedgerSheet({
 }) {
   const { layout: ledgerLayout } = useLedgerLayout();
   const isWorkbench = ledgerLayout === "workbench";
+  const isMobileSpreadsheet = layoutUsesMobileSpreadsheet(ledgerLayout);
 
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -378,6 +381,11 @@ export function DailyLedgerSheet({
                   工作台
                 </span>
               ) : null}
+              {isMobileSpreadsheet ? (
+                <span className="ml-2 text-sm font-medium text-emerald-800">
+                  支出明細試算表
+                </span>
+              ) : null}
             </h1>
             {!isWorkbench ? (
               <p className="mt-0.5 text-sm font-medium text-slate-600">
@@ -429,7 +437,11 @@ export function DailyLedgerSheet({
             <span className="hidden lg:inline">
               右鍵可管理列與備註；轉數快／支出每筆可「＋備註」。
             </span>
-            <span className="lg:hidden">每列「列操作」或「＋備註」。</span>
+            <span className="lg:hidden">
+              {isMobileSpreadsheet
+                ? "左右滑動；日期旁「⋯」列操作；轉數快、銀行、撤單、其他支出合併在「支出明細」欄。"
+                : "每列「列操作」或「＋備註」。"}
+            </span>
             {organizationId ? (
             <span className="mt-1 block text-slate-600">
               登入後會從 Supabase 載入；編輯即存本機，改動後請按「儲存至 Supabase」。
@@ -549,7 +561,15 @@ export function DailyLedgerSheet({
             : "min-h-0 flex-1 overflow-auto p-3 pb-28 sm:p-4 sm:pb-6 lg:p-6"
         }
       >
-        <div className={isWorkbench ? "block" : "lg:hidden"}>
+        <div
+          className={
+            isMobileSpreadsheet
+              ? "hidden"
+              : isWorkbench
+                ? "block"
+                : "lg:hidden"
+          }
+        >
           <DailyLedgerMobileRows
             rows={computed}
             totals={totals}
@@ -567,59 +587,115 @@ export function DailyLedgerSheet({
           />
         </div>
 
-        <div className={isWorkbench ? "hidden" : "hidden lg:block"}>
-          <p className="mb-2 text-center text-xs text-slate-500 xl:hidden">
+        <div
+          className={
+            isWorkbench
+              ? "hidden"
+              : isMobileSpreadsheet
+                ? "block"
+                : "hidden lg:block"
+          }
+        >
+          <p
+            className={`mb-2 text-center text-xs text-slate-500 ${
+              isMobileSpreadsheet ? "lg:hidden" : "xl:hidden"
+            }`}
+          >
             ← 左右滑動可查看更多欄位 →
           </p>
           <div className="ledger-table-scroll ledger-table-shell overflow-x-auto overscroll-x-contain rounded-2xl bg-white">
           <div className="inline-block min-w-full align-top">
-          <table className="w-full min-w-[1100px] border-collapse text-sm">
+          <table
+            className={`w-full border-collapse text-sm ${
+              isMobileSpreadsheet ? "min-w-[720px]" : "min-w-[1100px]"
+            }`}
+          >
             <thead>
-              <tr className="ledger-thead-row-main">
-                <th rowSpan={2} className="ledger-th ledger-sticky-col sticky left-0 z-20 min-w-[7.5rem]">
-                  日期
-                </th>
-                <th colSpan={3} className="ledger-th">
-                  收入明細
-                </th>
-                <th rowSpan={2} className="ledger-th ledger-th-accent min-w-[5.5rem]">
-                  總收入
-                </th>
-                <th colSpan={2} className="ledger-th">
-                  轉數快（FPS）
-                </th>
-                <th rowSpan={2} className="ledger-th">
-                  已入銀行
-                  <span className="block text-[10px] font-normal opacity-90">
-                    公司
-                  </span>
-                </th>
-                <th rowSpan={2} className="ledger-th">
-                  待入銀行
-                  <span className="block text-[10px] font-normal opacity-90">
-                    公司
-                  </span>
-                </th>
-                <th rowSpan={2} className="ledger-th">
-                  撤單
-                </th>
-                <th rowSpan={2} className="ledger-th min-w-[11rem]">
-                  支出
-                  <span className="block text-[10px] font-normal opacity-90">
-                    可多筆
-                  </span>
-                </th>
-                <th rowSpan={2} className="ledger-th ledger-th-accent min-w-[5.5rem]">
-                  尾數
-                </th>
-              </tr>
-              <tr className="ledger-thead-row-sub">
-                <th className="ledger-th-sub">油</th>
-                <th className="ledger-th-sub">水</th>
-                <th className="ledger-th-sub">尿素</th>
-                <th className="ledger-th-sub min-w-[7.5rem]">收款方式</th>
-                <th className="ledger-th-sub min-w-[5.5rem]">金額</th>
-              </tr>
+              {isMobileSpreadsheet ? (
+                <tr className="ledger-thead-row-main">
+                  <th className="ledger-th ledger-sticky-col sticky left-0 z-20 min-w-[7.5rem]">
+                    日期
+                  </th>
+                  <th className="ledger-th">油</th>
+                  <th className="ledger-th">水</th>
+                  <th className="ledger-th">尿素</th>
+                  <th className="ledger-th ledger-th-accent min-w-[5rem]">
+                    總收入
+                  </th>
+                  <th className="ledger-th min-w-[18rem]">
+                    支出明細
+                    <span className="block text-[10px] font-normal opacity-90">
+                      轉數快 · 銀行 · 撤單 · 其他
+                    </span>
+                  </th>
+                  <th className="ledger-th ledger-th-accent min-w-[5rem]">
+                    當日尾數
+                    <span className="block text-[10px] font-normal opacity-90">
+                      逐日累計
+                    </span>
+                  </th>
+                </tr>
+              ) : (
+                <>
+                  <tr className="ledger-thead-row-main">
+                    <th
+                      rowSpan={2}
+                      className="ledger-th ledger-sticky-col sticky left-0 z-20 min-w-[7.5rem]"
+                    >
+                      日期
+                    </th>
+                    <th colSpan={3} className="ledger-th">
+                      收入明細
+                    </th>
+                    <th
+                      rowSpan={2}
+                      className="ledger-th ledger-th-accent min-w-[5.5rem]"
+                    >
+                      總收入
+                    </th>
+                    <th colSpan={2} className="ledger-th">
+                      轉數快（FPS）
+                    </th>
+                    <th rowSpan={2} className="ledger-th">
+                      已入銀行
+                      <span className="block text-[10px] font-normal opacity-90">
+                        公司
+                      </span>
+                    </th>
+                    <th rowSpan={2} className="ledger-th">
+                      待入銀行
+                      <span className="block text-[10px] font-normal opacity-90">
+                        公司
+                      </span>
+                    </th>
+                    <th rowSpan={2} className="ledger-th">
+                      撤單
+                    </th>
+                    <th rowSpan={2} className="ledger-th min-w-[11rem]">
+                      支出
+                      <span className="block text-[10px] font-normal opacity-90">
+                        可多筆
+                      </span>
+                    </th>
+                    <th
+                      rowSpan={2}
+                      className="ledger-th ledger-th-accent min-w-[5.5rem]"
+                    >
+                      當日尾數
+                      <span className="block text-[10px] font-normal opacity-90">
+                        逐日累計
+                      </span>
+                    </th>
+                  </tr>
+                  <tr className="ledger-thead-row-sub">
+                    <th className="ledger-th-sub">油</th>
+                    <th className="ledger-th-sub">水</th>
+                    <th className="ledger-th-sub">尿素</th>
+                    <th className="ledger-th-sub min-w-[7.5rem]">收款方式</th>
+                    <th className="ledger-th-sub min-w-[5.5rem]">金額</th>
+                  </tr>
+                </>
+              )}
             </thead>
             <tbody>
               {computed.map((row) => (
@@ -632,14 +708,34 @@ export function DailyLedgerSheet({
                     className="ledger-td ledger-sticky-col sticky left-0 z-10 bg-white group-hover:bg-emerald-50/40"
                     onContextMenu={(e) => openRowContextMenu(e, row.id)}
                   >
-                    <input
-                      type="date"
-                      value={row.date}
-                      onChange={(e) =>
-                        updateRow(row.id, { date: e.target.value })
-                      }
-                      className="ledger-input w-full min-w-[7rem] text-left"
-                    />
+                    <div className="flex min-w-[7.5rem] items-center gap-1">
+                      <input
+                        type="date"
+                        value={row.date}
+                        onChange={(e) =>
+                          updateRow(row.id, { date: e.target.value })
+                        }
+                        className={`ledger-input min-w-0 flex-1 text-left ${
+                          isMobileSpreadsheet ? "ledger-touch-input" : "w-full min-w-[7rem]"
+                        }`}
+                      />
+                      {isMobileSpreadsheet ? (
+                        <button
+                          type="button"
+                          className="ledger-touch-btn shrink-0 rounded-lg border border-slate-200 px-2 py-1.5 text-sm font-medium text-slate-700 lg:hidden"
+                          aria-label="列操作"
+                          onClick={(e) =>
+                            openMenuFromAnchor(
+                              row.id,
+                              undefined,
+                              e.currentTarget,
+                            )
+                          }
+                        >
+                          ⋯
+                        </button>
+                      ) : null}
+                    </div>
                   </td>
                   {REVENUE_FIELDS.map((field) => (
                     <NotableAmountCell
@@ -662,85 +758,160 @@ export function DailyLedgerSheet({
                   >
                     {formatNum(row.productSubtotal)}
                   </td>
-                  <FpsEntriesCell
-                    entries={row.fpsEntries}
-                    showAllNotes={showAllNotes}
-                    formatNum={formatNum}
-                    parseNum={parseNum}
-                    onChange={(fpsEntries) =>
-                      setFpsEntries(row.id, fpsEntries)
-                    }
-                    onAmountContextMenu={(e, entryId) =>
-                      openContextMenu(e, row.id, "fpsAmount", {
-                        fpsEntryId: entryId,
-                      })
-                    }
-                    onEditEntryNote={(entryId) => {
-                      const entry = row.fpsEntries.find((e) => e.id === entryId);
-                      setNoteEditor({
-                        rowId: row.id,
-                        noteKey: "fpsAmount",
-                        fpsEntryId: entryId,
-                        initialText: entry?.note ?? "",
-                      });
-                    }}
-                    onRowContextMenu={(e) => openRowContextMenu(e, row.id)}
-                  />
-                  {OTHER_PAYMENT_FIELDS.map((field) => (
-                    <NotableAmountCell
-                      key={field}
-                      noteKey={field}
-                      note={getNote(row, field)}
-                      showAllNotes={showAllNotes}
-                      value={row[field]}
-                      formatNum={formatNum}
-                      parseNum={parseNum}
-                      onValueChange={(v) => updateRow(row.id, { [field]: v })}
-                      onContextMenu={(e, noteKey) =>
-                        openContextMenu(e, row.id, noteKey)
-                      }
-                    />
-                  ))}
-                  <ExpenseEntriesCell
-                    entries={row.expenseEntries}
-                    showAllNotes={showAllNotes}
-                    formatNum={formatNum}
-                    parseNum={parseNum}
-                    onChange={(expenseEntries) =>
-                      setExpenseEntries(row.id, expenseEntries)
-                    }
-                    onAmountContextMenu={(e, entryId) =>
-                      openContextMenu(e, row.id, "expenses", {
-                        expenseEntryId: entryId,
-                      })
-                    }
-                    onEditEntryNote={(entryId) => {
-                      const entry = row.expenseEntries.find(
-                        (e) => e.id === entryId,
-                      );
-                      setNoteEditor({
-                        rowId: row.id,
-                        noteKey: "expenses",
-                        expenseEntryId: entryId,
-                        initialText: entry?.note ?? "",
-                      });
-                    }}
-                    onRowContextMenu={(e) => openRowContextMenu(e, row.id)}
-                  />
+                  {isMobileSpreadsheet ? (
+                    <td
+                      className="ledger-td align-top"
+                      onContextMenu={(e) => openRowContextMenu(e, row.id)}
+                    >
+                      <LedgerUnifiedOutflowEditor
+                        row={row}
+                        showAllNotes={showAllNotes}
+                        formatNum={formatNum}
+                        parseNum={parseNum}
+                        getNote={getNote}
+                        onPatch={(patch) => updateRow(row.id, patch)}
+                        onFpsChange={(fpsEntries) =>
+                          setFpsEntries(row.id, fpsEntries)
+                        }
+                        onExpenseChange={(expenseEntries) =>
+                          setExpenseEntries(row.id, expenseEntries)
+                        }
+                        onAmountContextMenu={(e, target) => {
+                          if (target.kind === "fps") {
+                            openContextMenu(e, row.id, "fpsAmount", {
+                              fpsEntryId: target.entryId,
+                            });
+                          } else {
+                            openContextMenu(e, row.id, "expenses", {
+                              expenseEntryId: target.entryId,
+                            });
+                          }
+                        }}
+                        onEditFpsNote={(entryId) => {
+                          const entry = row.fpsEntries.find(
+                            (e) => e.id === entryId,
+                          );
+                          setNoteEditor({
+                            rowId: row.id,
+                            noteKey: "fpsAmount",
+                            fpsEntryId: entryId,
+                            initialText: entry?.note ?? "",
+                          });
+                        }}
+                        onEditExpenseNote={(entryId) => {
+                          const entry = row.expenseEntries.find(
+                            (e) => e.id === entryId,
+                          );
+                          setNoteEditor({
+                            rowId: row.id,
+                            noteKey: "expenses",
+                            expenseEntryId: entryId,
+                            initialText: entry?.note ?? "",
+                          });
+                        }}
+                        onBankContextMenu={(e, noteKey) =>
+                          openContextMenu(e, row.id, noteKey)
+                        }
+                        onEditBankNote={(noteKey) => {
+                          setNoteEditor({
+                            rowId: row.id,
+                            noteKey,
+                            initialText: getNote(row, noteKey) ?? "",
+                          });
+                        }}
+                      />
+                    </td>
+                  ) : (
+                    <>
+                      <FpsEntriesCell
+                        entries={row.fpsEntries}
+                        showAllNotes={showAllNotes}
+                        formatNum={formatNum}
+                        parseNum={parseNum}
+                        onChange={(fpsEntries) =>
+                          setFpsEntries(row.id, fpsEntries)
+                        }
+                        onAmountContextMenu={(e, entryId) =>
+                          openContextMenu(e, row.id, "fpsAmount", {
+                            fpsEntryId: entryId,
+                          })
+                        }
+                        onEditEntryNote={(entryId) => {
+                          const entry = row.fpsEntries.find(
+                            (e) => e.id === entryId,
+                          );
+                          setNoteEditor({
+                            rowId: row.id,
+                            noteKey: "fpsAmount",
+                            fpsEntryId: entryId,
+                            initialText: entry?.note ?? "",
+                          });
+                        }}
+                        onRowContextMenu={(e) => openRowContextMenu(e, row.id)}
+                      />
+                      {OTHER_PAYMENT_FIELDS.map((field) => (
+                        <NotableAmountCell
+                          key={field}
+                          noteKey={field}
+                          note={getNote(row, field)}
+                          showAllNotes={showAllNotes}
+                          value={row[field]}
+                          formatNum={formatNum}
+                          parseNum={parseNum}
+                          onValueChange={(v) =>
+                            updateRow(row.id, { [field]: v })
+                          }
+                          onContextMenu={(e, noteKey) =>
+                            openContextMenu(e, row.id, noteKey)
+                          }
+                        />
+                      ))}
+                      <ExpenseEntriesCell
+                        entries={row.expenseEntries}
+                        showAllNotes={showAllNotes}
+                        formatNum={formatNum}
+                        parseNum={parseNum}
+                        onChange={(expenseEntries) =>
+                          setExpenseEntries(row.id, expenseEntries)
+                        }
+                        onAmountContextMenu={(e, entryId) =>
+                          openContextMenu(e, row.id, "expenses", {
+                            expenseEntryId: entryId,
+                          })
+                        }
+                        onEditEntryNote={(entryId) => {
+                          const entry = row.expenseEntries.find(
+                            (e) => e.id === entryId,
+                          );
+                          setNoteEditor({
+                            rowId: row.id,
+                            noteKey: "expenses",
+                            expenseEntryId: entryId,
+                            initialText: entry?.note ?? "",
+                          });
+                        }}
+                        onRowContextMenu={(e) =>
+                          openRowContextMenu(e, row.id)
+                        }
+                      />
+                    </>
+                  )}
                   <td
                     className="ledger-td computed font-medium text-emerald-900"
                     onContextMenu={(e) => openRowContextMenu(e, row.id)}
                   >
                     {isLedgerRowActive(row)
-                      ? formatNum(row.balance)
-                      : ""}
+                      ? formatNum(row.dailyBalance) || "0"
+                      : "0"}
                   </td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr className="bg-slate-100 font-semibold text-slate-900">
-                <td className="ledger-td ledger-sticky-col sticky left-0 z-10 bg-slate-100">總計</td>
+                <td className="ledger-td ledger-sticky-col sticky left-0 z-10 bg-slate-100">
+                  總計
+                </td>
                 <td className="ledger-td text-right tabular-nums">
                   {formatNum(totals.fuel)}
                 </td>
@@ -753,31 +924,50 @@ export function DailyLedgerSheet({
                 <td className="ledger-td text-right tabular-nums">
                   {formatNum(totals.productSubtotal)}
                 </td>
-                <td className="ledger-td text-right tabular-nums" colSpan={2}>
-                  公司 {formatNum(totals.fpsCompany)} · 私人{" "}
-                  {formatNum(totals.fpsPrivate)} · Alipay{" "}
-                  {formatNum(totals.fpsAlipay)}
-                </td>
-                <td className="ledger-td text-right tabular-nums">
-                  {formatNum(totals.bankDeposited)}
-                </td>
-                <td className="ledger-td text-right tabular-nums">
-                  {formatNum(totals.bankPending)}
-                </td>
-                <td className="ledger-td text-right tabular-nums">
-                  {formatNum(totals.cancelled)}
-                </td>
-                <td className="ledger-td text-right tabular-nums align-top">
-                  {formatNum(totals.expenses)}
-                </td>
+                {isMobileSpreadsheet ? (
+                  <td className="ledger-td text-xs leading-relaxed text-slate-700">
+                    轉數快 公司 {formatNum(totals.fpsCompany)} · 私人{" "}
+                    {formatNum(totals.fpsPrivate)} · Alipay{" "}
+                    {formatNum(totals.fpsAlipay)}
+                    <br />
+                    已入 {formatNum(totals.bankDeposited)} · 待入{" "}
+                    {formatNum(totals.bankPending)} · 撤單{" "}
+                    {formatNum(totals.cancelled)} · 其他支出{" "}
+                    {formatNum(totals.expenses)}
+                  </td>
+                ) : (
+                  <>
+                    <td className="ledger-td text-right tabular-nums" colSpan={2}>
+                      公司 {formatNum(totals.fpsCompany)} · 私人{" "}
+                      {formatNum(totals.fpsPrivate)} · Alipay{" "}
+                      {formatNum(totals.fpsAlipay)}
+                    </td>
+                    <td className="ledger-td text-right tabular-nums">
+                      {formatNum(totals.bankDeposited)}
+                    </td>
+                    <td className="ledger-td text-right tabular-nums">
+                      {formatNum(totals.bankPending)}
+                    </td>
+                    <td className="ledger-td text-right tabular-nums">
+                      {formatNum(totals.cancelled)}
+                    </td>
+                    <td className="ledger-td text-right tabular-nums align-top">
+                      {formatNum(totals.expenses)}
+                    </td>
+                  </>
+                )}
                 <td className="ledger-td text-right tabular-nums text-emerald-800">
                   {formatNum(totals.closingBalance)}
                 </td>
               </tr>
               <tr className="bg-emerald-50 text-xs text-slate-600">
-                <td colSpan={12} className="px-3 py-2">
-                  右鍵：備註、列操作、WhatsApp／微信匯出 ·
-                  尾數＝前日結存＋當日收支（僅在有填資料的列顯示；未填列仍沿用前日結存計算下一列）
+                <td
+                  colSpan={isMobileSpreadsheet ? 7 : 12}
+                  className="px-3 py-2"
+                >
+                  {isMobileSpreadsheet
+                    ? "支出明細含轉數快、銀行、撤單、其他支出；撤單自總收入扣除，其餘扣尾數。"
+                    : "右鍵：備註、列操作、WhatsApp／微信匯出 · 當日尾數＝當日淨收入−出帳（非累計）；未填列顯示 0；上方期末尾數為整月累計"}
                 </td>
               </tr>
             </tfoot>
@@ -893,10 +1083,7 @@ export function DailyLedgerSheet({
               ),
             );
             if (!result.ok && result.error) alert(result.error);
-            else {
-              const msg = weChatShareSuccessMessage(result.mode);
-              if (msg) alert(msg);
-            }
+            else alert(weChatShareSuccessMessage(result.mode));
           })();
         }}
         onWeChatMonth={() => {
@@ -916,10 +1103,7 @@ export function DailyLedgerSheet({
               ),
             );
             if (!result.ok && result.error) alert(result.error);
-            else {
-              const msg = weChatShareSuccessMessage(result.mode);
-              if (msg) alert(msg);
-            }
+            else alert(weChatShareSuccessMessage(result.mode));
           })();
         }}
       />

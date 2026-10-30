@@ -70,6 +70,9 @@ export type DailyLedgerComputed = DailyLedgerRow & {
   fpsAlipay: number;
   /** 當列支出加總（由 expenseEntries 計算） */
   expenses: number;
+  /** 當日淨變動（淨收入 − 出帳）；畫面「當日尾數」用此欄 */
+  dailyBalance: number;
+  /** 逐日累計結存（供下一列與期末尾數） */
   balance: number;
 };
 
@@ -154,6 +157,21 @@ export function totalExpenseOutflow(entries: ExpenseEntry[]): number {
   );
 }
 
+/** 當日從尾數扣減的出帳（不含撤單；撤單自總收入扣除） */
+export function totalRowCashOutflow(
+  row: Pick<
+    DailyLedgerRow,
+    "fpsEntries" | "bankDeposited" | "bankPending" | "expenseEntries"
+  >,
+): number {
+  return (
+    totalFpsOutflow(row.fpsEntries) +
+    row.bankDeposited +
+    row.bankPending +
+    totalExpenseOutflow(row.expenseEntries)
+  );
+}
+
 export function formatExpenseEntriesSummary(entries: ExpenseEntry[]): string {
   const parts = entries.filter(isExpenseEntryCounted).map((e) => {
     const head = e.label.trim() ? `${e.label.trim()} ` : "支出 ";
@@ -162,7 +180,7 @@ export function formatExpenseEntriesSummary(entries: ExpenseEntry[]): string {
   return parts.join("；") || "";
 }
 
-/** 該列是否有輸入（無輸入的列不顯示尾數，但仍會沿用前日結存計算） */
+/** 該列是否有輸入（未填列仍會沿用前日結存計算當日尾數） */
 export function isLedgerRowActive(row: DailyLedgerRow): boolean {
   return (
     row.fuel > 0 ||
@@ -387,7 +405,8 @@ export function computeRows(rows: DailyLedgerRow[]): DailyLedgerComputed[] {
       row.bankDeposited +
       row.bankPending +
       expenses;
-    const balance = previousBalance + totalRevenue - outflow;
+    const dailyBalance = totalRevenue - outflow;
+    const balance = previousBalance + dailyBalance;
     previousBalance = balance;
     return {
       ...row,
@@ -395,6 +414,7 @@ export function computeRows(rows: DailyLedgerRow[]): DailyLedgerComputed[] {
       productSubtotal,
       totalRevenue,
       expenses,
+      dailyBalance,
       balance,
     };
   });
